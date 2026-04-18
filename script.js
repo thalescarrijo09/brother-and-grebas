@@ -24,7 +24,7 @@ const auth = getAuth(app);
 
 // ===== CONFIG ADMIN =====
 // ⚠️ SUBSTITUA pelo SEU UID copiado do Firebase Auth!
-const ADMIN_UID = "COLE_SEU_UID_AQUI";
+const ADMIN_UID = "DJtE0gEcDRd4JFARFxAobJshd8j1";
 
 // ===== CONFIG IMGBB =====
 const IMGBB_API_KEY = "b720bed751ebd8db5cf2d61b47abb2ba";
