@@ -3,157 +3,231 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🔥 Brothers e Grebas — Churrasco Oficial</title>
+  <meta name="description" content="Brothers e Grebas - O churrasco oficial da galera" />
+  <title>🔥 Brothers e Grebas 🥩</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Rye&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>" />
 </head>
 <body>
 
-  <header class="hero">
-    <h1>🔥 Brothers e Grebas 🥩</h1>
-    <p class="subtitle">O churrasco oficial da galera</p>
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="home">🏠 Início</button>
-      <button class="tab-btn" data-tab="ranking">🏆 Ranking</button>
-      <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
-      <button class="tab-btn" data-tab="presenca">✅ Presença</button>
-      <button class="tab-btn" data-tab="galeria">📸 Galeria</button>
-      <button class="tab-btn" data-tab="mural">🤬 Mural de Ofensas</button>
-      <button class="tab-btn" data-tab="membros">👥 Membros</button>
-    </nav>
-  </header>
+  <!-- ===== TELA DE LOGIN ===== -->
+  <div id="tela-login" class="tela-login">
+    <div class="login-box">
+      <h1>🔥 Brothers e Grebas 🥩</h1>
+      <p class="subtitle">Entra aí pra participar do churrasco</p>
+      <form id="form-login">
+        <input type="email" id="login-email" placeholder="📧 Email" required autocomplete="email" />
+        <input type="password" id="login-senha" placeholder="🔒 Senha" required autocomplete="current-password" />
+        <button type="submit">🔑 Entrar</button>
+        <p id="login-erro" class="login-erro"></p>
+      </form>
+      <p class="login-hint">Não tem conta? Fala com o admin do grupo 🍻</p>
+    </div>
+  </div>
 
-  <main>
+  <!-- ===== APP PRINCIPAL (só logado) ===== -->
+  <div id="app-container" class="hidden">
 
-    <!-- HOME -->
-    <section id="home" class="tab-content active">
-      <div class="card destaque">
-        <h2>🔥 Próximo Churrasco</h2>
-        <div id="proximo-churrasco">Carregando...</div>
-      </div>
-      <div class="cards-row">
-        <div class="card mini">
-          <h3>🏆 Mestre do Churrasco</h3>
-          <div id="mestre-churrasco">—</div>
+    <!-- ===== HEADER ===== -->
+    <header>
+      <div class="header-top">
+        <div class="user-info">
+          <span id="user-nome">👤</span>
+          <span id="user-badge" class="badge-admin hidden">👑 ADMIN</span>
         </div>
-        <div class="card mini">
-          <h3>👻 Sumido da Vez</h3>
-          <div id="sumido-vez">—</div>
-        </div>
-        <div class="card mini">
-          <h3>📊 Total de Churrascos</h3>
-          <div id="total-churrascos">0</div>
-        </div>
+        <button id="btn-logout" class="btn-logout">🚪 Sair</button>
       </div>
-    </section>
 
-    <!-- RANKING -->
-    <section id="ranking" class="tab-content">
-      <div class="card">
-        <h2>🏆 Ranking dos Churrasqueiros</h2>
-        <p class="hint">Quem mais botou fogo na grelha</p>
-        <ol id="lista-ranking" class="ranking-list"></ol>
-      </div>
-      <div class="card">
-        <h2>👻 Ranking do Sumido</h2>
-        <p class="hint">Quem mais deu bolo na galera</p>
-        <ol id="lista-sumido" class="ranking-list sumido"></ol>
-      </div>
-    </section>
+      <h1>🔥 Brothers e Grebas 🥩</h1>
+      <p class="subtitle">O churrasco oficial da galera</p>
 
-    <!-- AGENDA -->
-    <section id="agenda" class="tab-content">
-      <div class="card">
-        <h2>📅 Agendar Novo Churrasco</h2>
-        <form id="form-agenda">
-          <input type="date" id="churrasco-data" required />
-          <input type="time" id="churrasco-hora" required />
-          <input type="text" id="churrasco-local" placeholder="Local (ex: casa do João)" required />
-          <select id="churrasco-responsavel" required>
-            <option value="">Churrasqueiro responsável...</option>
+      <nav>
+        <button class="tab-btn active" data-tab="inicio">🏠 Início</button>
+        <button class="tab-btn" data-tab="ranking">🏆 Ranking</button>
+        <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
+        <button class="tab-btn" data-tab="presenca">✅ Presença</button>
+        <button class="tab-btn" data-tab="galeria">📸 Galeria</button>
+        <button class="tab-btn" data-tab="ofensas">🤬 Mural de Ofensas</button>
+        <button class="tab-btn admin-only hidden" data-tab="membros">👥 Membros</button>
+      </nav>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <main>
+
+      <!-- ========== ABA INÍCIO ========== -->
+      <section id="inicio" class="tab-content active">
+        <div class="card">
+          <h2>🔥 Próximo Churrasco</h2>
+          <div id="proximo-churrasco">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>📊 Estatísticas da Galera</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="label">Total de Churrascos</div>
+              <div class="value" id="total-churrascos">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Mestre Churrasqueiro</div>
+              <div class="value" id="mestre-churrasco">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Sumido da Vez</div>
+              <div class="value" id="sumido-vez">—</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== ABA RANKING ========== -->
+      <section id="ranking" class="tab-content">
+        <div class="card">
+          <h2>🏆 Ranking dos Churrasqueiros</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Quem mais fez churrasco pra galera 🔥
+          </p>
+          <ul id="lista-ranking">
+            <p class="hint">Carregando...</p>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h2>👻 Ranking dos Sumidos</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Quem mais faltou nos churrascos (vergonha!) 😤
+          </p>
+          <ul id="lista-sumido">
+            <p class="hint">Carregando...</p>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ========== ABA AGENDA ========== -->
+      <section id="agenda" class="tab-content">
+        <div class="card">
+          <h2>📅 Agendar Churrasco</h2>
+          <form id="form-agenda">
+            <input type="date" id="churrasco-data" required />
+            <input type="time" id="churrasco-hora" required />
+            <input type="text" id="churrasco-local" placeholder="📍 Local do churrasco" required />
+            <select id="churrasco-responsavel" required>
+              <option value="">Churrasqueiro responsável...</option>
+            </select>
+            <textarea id="churrasco-obs" placeholder="📝 Observações (o que levar, etc)"></textarea>
+            <button type="submit">🔥 Agendar Churrasco</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>🗓️ Próximos Churrascos</h2>
+          <div id="lista-agenda">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>📜 Histórico de Churrascos</h2>
+          <div id="lista-historico">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== ABA PRESENÇA ========== -->
+      <section id="presenca" class="tab-content">
+        <div class="card">
+          <h2>✅ Marcar Presença</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Selecione o churrasco e marque quem compareceu. Ao salvar, o churrasco é marcado como realizado.
+          </p>
+          <select id="select-churrasco-presenca">
+            <option value="">Selecione o churrasco...</option>
           </select>
-          <textarea id="churrasco-obs" placeholder="Observações (opcional)"></textarea>
-          <button type="submit">🔥 Agendar Churrasco</button>
-        </form>
-      </div>
-      <div class="card">
-        <h2>📅 Próximos Churrascos</h2>
-        <div id="lista-agenda"></div>
-      </div>
-      <div class="card">
-        <h2>📜 Churrascos Realizados</h2>
-        <div id="lista-historico"></div>
-      </div>
-    </section>
 
-    <!-- PRESENÇA -->
-    <section id="presenca" class="tab-content">
-      <div class="card">
-        <h2>✅ Marcar Presença</h2>
-        <p class="hint">Selecione um churrasco e marque quem foi</p>
-        <select id="select-churrasco-presenca">
-          <option value="">Selecione o churrasco...</option>
-        </select>
-        <div id="lista-presenca-membros"></div>
-        <button id="btn-salvar-presenca" class="hidden">💾 Salvar Presença & Finalizar Churrasco</button>
-      </div>
-    </section>
+          <div id="lista-presenca-membros"></div>
 
-    <!-- GALERIA -->
-    <section id="galeria" class="tab-content">
-      <div class="card">
-        <h2>📸 Enviar Foto</h2>
-        <form id="form-foto">
-          <input type="file" id="foto-arquivo" accept="image/*" required />
-          <input type="text" id="foto-legenda" placeholder="Legenda (ex: Churrasco de 01/01)" />
-          <button type="submit">📤 Enviar Foto</button>
-        </form>
-        <div id="upload-status"></div>
-      </div>
-      <div class="card">
-        <h2>📸 Galeria de Churrascos</h2>
-        <div id="galeria-grid" class="galeria-grid"></div>
-      </div>
-    </section>
+          <button id="btn-salvar-presenca" class="btn-primary hidden">
+            ✅ Salvar Presença e Finalizar
+          </button>
+        </div>
+      </section>
 
-    <!-- MURAL DE OFENSAS -->
-    <section id="mural" class="tab-content">
-      <div class="card">
-        <h2>🤬 Mural de Ofensas</h2>
-        <p class="hint">Zoa à vontade, mas sem choro depois 😂</p>
-        <form id="form-ofensa">
-          <input type="text" id="ofensa-autor" placeholder="Seu nome" required />
-          <textarea id="ofensa-texto" placeholder="Solta o verbo..." required></textarea>
-          <button type="submit">🔥 Postar Ofensa</button>
-        </form>
-      </div>
-      <div class="card">
-        <h2>📜 Últimas Ofensas</h2>
-        <div id="lista-ofensas"></div>
-      </div>
-    </section>
+      <!-- ========== ABA GALERIA ========== -->
+      <section id="galeria" class="tab-content">
+        <div class="card">
+          <h2>📸 Enviar Foto</h2>
+          <form id="form-foto">
+            <input type="file" id="foto-arquivo" accept="image/*" required />
+            <input type="text" id="foto-legenda" placeholder="📝 Legenda (opcional)" />
+            <button type="submit">📤 Enviar Foto</button>
+            <p id="upload-status"></p>
+          </form>
+        </div>
 
-    <!-- MEMBROS -->
-    <section id="membros" class="tab-content">
-      <div class="card">
-        <h2>👥 Cadastrar Membro</h2>
-        <form id="form-membro">
-          <input type="text" id="membro-nome" placeholder="Nome do brother ou greba" required />
-          <button type="submit">➕ Adicionar</button>
-        </form>
-      </div>
-      <div class="card">
-        <h2>👥 Membros do Grupo</h2>
-        <div id="lista-membros"></div>
-      </div>
-    </section>
+        <div class="card">
+          <h2>🖼️ Galeria do Grupo</h2>
+          <div id="galeria-grid">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+      </section>
 
-  </main>
+      <!-- ========== ABA MURAL DE OFENSAS ========== -->
+      <section id="ofensas" class="tab-content">
+        <div class="card">
+          <h2>🤬 Postar Ofensa</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Zoa quem merece! Sua ofensa vai ser postada com seu nome de login. 😈
+          </p>
+          <form id="form-ofensa">
+            <textarea id="ofensa-texto" placeholder="✍️ Escreve aí a ofensa..." required></textarea>
+            <button type="submit">🔥 Postar Ofensa</button>
+          </form>
+        </div>
 
-  <footer>
-    <p>🔥 Brothers e Grebas © 2026 — Feito com carvão e amor</p>
-  </footer>
+        <div class="card">
+          <h2>📢 Mural de Ofensas</h2>
+          <div id="lista-ofensas">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+      </section>
 
+      <!-- ========== ABA MEMBROS (SÓ ADMIN) ========== -->
+      <section id="membros" class="tab-content">
+        <div class="card">
+          <h2>👥 Cadastrar Membro</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            ⚠️ Só o admin pode cadastrar novos membros do grupo.
+          </p>
+          <form id="form-membro">
+            <input type="text" id="membro-nome" placeholder="👤 Nome do brother ou greba" required />
+            <button type="submit">➕ Adicionar</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>👨‍👩‍👧‍👦 Membros do Grupo</h2>
+          <div id="lista-membros">
+            <p class="hint">Carregando...</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===== FOOTER ===== -->
+    <footer style="text-align:center; padding: 20px; color:#8a6a50; font-size:0.85rem; border-top: 1px solid #5a3a1f; margin-top: 30px;">
+      🔥 Brothers e Grebas © 2026 — Feito com 🥩 e muita zoeira
+    </footer>
+
+  </div>
+
+  <!-- ===== SCRIPT (module) ===== -->
   <script type="module" src="script.js"></script>
 </body>
 </html>
