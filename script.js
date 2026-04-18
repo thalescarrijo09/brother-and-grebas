@@ -1,9 +1,12 @@
-// ===== FIREBASE IMPORTS (apenas Firestore agora!) =====
+// ===== FIREBASE IMPORTS =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // ===== CONFIG FIREBASE =====
 const firebaseConfig = {
@@ -17,16 +20,98 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// ===== CONFIG IMGBB (hospedagem das fotos - GRÁTIS) =====
+// ===== CONFIG ADMIN =====
+// ⚠️ SUBSTITUA pelo SEU UID copiado do Firebase Auth!
+const ADMIN_UID = "COLE_SEU_UID_AQUI";
+
+// ===== CONFIG IMGBB =====
 const IMGBB_API_KEY = "b720bed751ebd8db5cf2d61b47abb2ba";
 const IMGBB_URL = "https://api.imgbb.com/1/upload";
 
-// ===== ESTADO LOCAL =====
+// ===== ESTADO =====
+let currentUser = null;
+let isAdmin = false;
 let membros = [];
 let churrascos = [];
 let ofensas = [];
 let fotos = [];
+let unsubscribes = [];
+
+// ===== LOGIN =====
+const formLogin = document.getElementById('form-login');
+const telaLogin = document.getElementById('tela-login');
+const appContainer = document.getElementById('app-container');
+const loginErro = document.getElementById('login-erro');
+
+formLogin.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  loginErro.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, senha);
+  } catch (err) {
+    console.error(err);
+    const msgs = {
+      'auth/invalid-credential': 'Email ou senha incorretos',
+      'auth/user-not-found': 'Usuário não cadastrado',
+      'auth/wrong-password': 'Senha incorreta',
+      'auth/invalid-email': 'Email inválido',
+      'auth/too-many-requests': 'Muitas tentativas. Tenta mais tarde.'
+    };
+    loginErro.textContent = msgs[err.code] || 'Erro ao entrar. Tenta de novo.';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  if (!confirm('Sair da conta?')) return;
+  await signOut(auth);
+});
+
+onAuthStateChanged(auth, (user) => {
+  // Desliga listeners antigos
+  unsubscribes.forEach(u => u && u());
+  unsubscribes = [];
+
+  if (user) {
+    currentUser = user;
+    isAdmin = user.uid === ADMIN_UID;
+
+    telaLogin.classList.add('hidden');
+    appContainer.classList.remove('hidden');
+
+    // Mostra nome do usuário (parte antes do @)
+    const nomeExibido = user.displayName || user.email.split('@')[0];
+    document.getElementById('user-nome').textContent = `👤 ${nomeExibido}`;
+
+    // Badge admin
+    const badge = document.getElementById('user-badge');
+    if (isAdmin) badge.classList.remove('hidden');
+    else badge.classList.add('hidden');
+
+    // Esconde aba de membros pra não-admin
+    document.querySelectorAll('.admin-only').forEach(el => {
+      if (isAdmin) el.classList.remove('hidden');
+      else el.classList.add('hidden');
+    });
+
+    // Esconde formulário de cadastrar membro pra não-admin
+    const formMembro = document.getElementById('form-membro');
+    if (formMembro) {
+      formMembro.style.display = isAdmin ? '' : 'none';
+    }
+
+    iniciarListeners();
+    formLogin.reset();
+  } else {
+    currentUser = null;
+    isAdmin = false;
+    telaLogin.classList.remove('hidden');
+    appContainer.classList.add('hidden');
+  }
+});
 
 // ===== NAVEGAÇÃO DE ABAS =====
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -38,60 +123,93 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ===== MEMBROS =====
-const formMembro = document.getElementById('form-membro');
-formMembro.addEventListener('submit', async (e) => {
+// ===== HELPER: nome do usuário atual =====
+function nomeAtual() {
+  if (!currentUser) return 'Anônimo';
+  return currentUser.displayName || currentUser.email.split('@')[0];
+}
+
+// ===== LISTENERS =====
+function iniciarListeners() {
+  unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
+    membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMembros();
+    renderSelectResponsavel();
+    renderSelectPresenca();
+    renderRankings();
+  }));
+
+  unsubscribes.push(onSnapshot(query(collection(db, 'churrascos'), orderBy('data', 'asc')), (snap) => {
+    churrascos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAgenda();
+    renderHistorico();
+    renderSelectPresenca();
+    renderRankings();
+    renderHome();
+  }));
+
+  unsubscribes.push(onSnapshot(query(collection(db, 'ofensas'), orderBy('criadoEm', 'desc')), (snap) => {
+    ofensas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderOfensas();
+  }));
+
+  unsubscribes.push(onSnapshot(query(collection(db, 'fotos'), orderBy('criadoEm', 'desc')), (snap) => {
+    fotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGaleria();
+  }));
+}
+
+// ===== MEMBROS (SÓ ADMIN) =====
+document.getElementById('form-membro').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar membros!'); return; }
   const nome = document.getElementById('membro-nome').value.trim();
   if (!nome) return;
-  await addDoc(collection(db, 'membros'), { nome, criadoEm: serverTimestamp() });
+  await addDoc(collection(db, 'membros'), {
+    nome,
+    criadoPor: currentUser.uid,
+    criadoEm: serverTimestamp()
+  });
   document.getElementById('membro-nome').value = '';
-});
-
-onSnapshot(collection(db, 'membros'), (snap) => {
-  membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderMembros();
-  renderSelectResponsavel();
-  renderSelectPresenca();
-  renderRankings();
 });
 
 function renderMembros() {
   const lista = document.getElementById('lista-membros');
   if (!membros.length) {
-    lista.innerHTML = '<p class="hint">Nenhum membro cadastrado ainda. Adicione os brothers e grebas!</p>';
+    lista.innerHTML = '<p class="hint">Nenhum membro cadastrado ainda.</p>';
     return;
   }
   lista.innerHTML = membros.map(m => `
     <span class="membro-item">
       👤 ${escapeHtml(m.nome)}
-      <button onclick="removerMembro('${m.id}')" title="Remover">✖</button>
+      ${isAdmin ? `<button onclick="removerMembro('${m.id}')" title="Remover">✖</button>` : ''}
     </span>
   `).join('');
 }
 
 window.removerMembro = async (id) => {
+  if (!isAdmin) return alert('🚫 Só admin remove membros');
   if (!confirm('Remover este membro?')) return;
   await deleteDoc(doc(db, 'membros', id));
 };
 
 function renderSelectResponsavel() {
   const sel = document.getElementById('churrasco-responsavel');
+  if (!sel) return;
   sel.innerHTML = '<option value="">Churrasqueiro responsável...</option>' +
     membros.map(m => `<option value="${m.id}">${escapeHtml(m.nome)}</option>`).join('');
 }
 
-// ===== AGENDA / CHURRASCOS =====
-const formAgenda = document.getElementById('form-agenda');
-formAgenda.addEventListener('submit', async (e) => {
+// ===== AGENDA =====
+document.getElementById('form-agenda').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = document.getElementById('churrasco-data').value;
   const hora = document.getElementById('churrasco-hora').value;
   const local = document.getElementById('churrasco-local').value.trim();
   const responsavelId = document.getElementById('churrasco-responsavel').value;
   const obs = document.getElementById('churrasco-obs').value.trim();
-
   const responsavel = membros.find(m => m.id === responsavelId);
+
   await addDoc(collection(db, 'churrascos'), {
     data, hora, local,
     responsavelId,
@@ -99,19 +217,12 @@ formAgenda.addEventListener('submit', async (e) => {
     obs,
     realizado: false,
     presentes: [],
+    criadoPor: currentUser.uid,
+    criadoPorNome: nomeAtual(),
     criadoEm: serverTimestamp()
   });
-  formAgenda.reset();
+  e.target.reset();
   alert('🔥 Churrasco agendado!');
-});
-
-onSnapshot(query(collection(db, 'churrascos'), orderBy('data', 'asc')), (snap) => {
-  churrascos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderAgenda();
-  renderHistorico();
-  renderSelectPresenca();
-  renderRankings();
-  renderHome();
 });
 
 function renderAgenda() {
@@ -122,15 +233,19 @@ function renderAgenda() {
     lista.innerHTML = '<p class="hint">Nenhum churrasco agendado. Bora marcar um!</p>';
     return;
   }
-  lista.innerHTML = proximos.map(c => `
-    <div class="evento-item">
-      <div class="data">📅 ${formatarData(c.data)} às ${c.hora}</div>
-      <div class="info">📍 ${escapeHtml(c.local)}</div>
-      <div class="info">🔥 Churrasqueiro: <strong>${escapeHtml(c.responsavelNome)}</strong></div>
-      ${c.obs ? `<div class="info">📝 ${escapeHtml(c.obs)}</div>` : ''}
-      <button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>
-    </div>
-  `).join('');
+  lista.innerHTML = proximos.map(c => {
+    const podeExcluir = isAdmin || c.criadoPor === currentUser.uid;
+    return `
+      <div class="evento-item">
+        <div class="data">📅 ${formatarData(c.data)} às ${c.hora}</div>
+        <div class="info">📍 ${escapeHtml(c.local)}</div>
+        <div class="info">🔥 Churrasqueiro: <strong>${escapeHtml(c.responsavelNome)}</strong></div>
+        ${c.obs ? `<div class="info">📝 ${escapeHtml(c.obs)}</div>` : ''}
+        ${c.criadoPorNome ? `<div class="info" style="font-size:0.8rem;opacity:0.7;">— agendado por ${escapeHtml(c.criadoPorNome)}</div>` : ''}
+        ${podeExcluir ? `<button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 function renderHistorico() {
@@ -145,18 +260,24 @@ function renderHistorico() {
       const m = membros.find(x => x.id === id);
       return m ? m.nome : '?';
     }).join(', ');
+    const podeExcluir = isAdmin || c.criadoPor === currentUser.uid;
     return `
       <div class="evento-item">
         <div class="data">✅ ${formatarData(c.data)}</div>
         <div class="info">📍 ${escapeHtml(c.local)} — 🔥 ${escapeHtml(c.responsavelNome)}</div>
         <div class="info">👥 Presentes (${(c.presentes||[]).length}): ${escapeHtml(presentesNomes) || '—'}</div>
-        <button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>
+        ${podeExcluir ? `<button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>` : ''}
       </div>
     `;
   }).join('');
 }
 
 window.excluirChurrasco = async (id) => {
+  const c = churrascos.find(x => x.id === id);
+  if (!c) return;
+  if (!isAdmin && c.criadoPor !== currentUser.uid) {
+    return alert('🚫 Só quem criou (ou o admin) pode excluir');
+  }
   if (!confirm('Excluir este churrasco?')) return;
   await deleteDoc(doc(db, 'churrascos', id));
 };
@@ -164,6 +285,7 @@ window.excluirChurrasco = async (id) => {
 // ===== PRESENÇA =====
 function renderSelectPresenca() {
   const sel = document.getElementById('select-churrasco-presenca');
+  if (!sel) return;
   const naoRealizados = churrascos.filter(c => !c.realizado);
   sel.innerHTML = '<option value="">Selecione o churrasco...</option>' +
     naoRealizados.map(c => `<option value="${c.id}">${formatarData(c.data)} — ${escapeHtml(c.local)}</option>`).join('');
@@ -190,7 +312,7 @@ document.getElementById('btn-salvar-presenca').addEventListener('click', async (
   const id = document.getElementById('btn-salvar-presenca').dataset.churrascoId;
   if (!id) return;
   const presentes = Array.from(document.querySelectorAll('#lista-presenca-membros input:checked')).map(i => i.value);
-  if (!confirm('Salvar presença e marcar churrasco como REALIZADO? Isso atualiza os rankings.')) return;
+  if (!confirm('Salvar presença e marcar churrasco como REALIZADO?')) return;
   await updateDoc(doc(db, 'churrascos', id), { presentes, realizado: true });
   alert('✅ Presença salva! Rankings atualizados.');
   document.getElementById('select-churrasco-presenca').value = '';
@@ -208,35 +330,28 @@ function renderRankings() {
     contagemChurras[c.responsavelId] = (contagemChurras[c.responsavelId] || 0) + 1;
   });
   const rankingChurras = membros.map(m => ({
-    nome: m.nome,
-    total: contagemChurras[m.id] || 0
+    nome: m.nome, total: contagemChurras[m.id] || 0
   })).sort((a,b) => b.total - a.total);
 
-  document.getElementById('lista-ranking').innerHTML = rankingChurras.length
-    ? rankingChurras.map(r => `
-        <li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.total} 🔥</span></li>
-      `).join('')
+  const listaRank = document.getElementById('lista-ranking');
+  if (listaRank) listaRank.innerHTML = rankingChurras.length
+    ? rankingChurras.map(r => `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.total} 🔥</span></li>`).join('')
     : '<p class="hint">Sem dados ainda.</p>';
 
   const contagemFaltas = {};
   realizados.forEach(c => {
     const presentes = c.presentes || [];
     membros.forEach(m => {
-      if (!presentes.includes(m.id)) {
-        contagemFaltas[m.id] = (contagemFaltas[m.id] || 0) + 1;
-      }
+      if (!presentes.includes(m.id)) contagemFaltas[m.id] = (contagemFaltas[m.id] || 0) + 1;
     });
   });
   const rankingSumido = membros.map(m => ({
-    nome: m.nome,
-    faltas: contagemFaltas[m.id] || 0,
-    total: totalRealizados
+    nome: m.nome, faltas: contagemFaltas[m.id] || 0, total: totalRealizados
   })).sort((a,b) => b.faltas - a.faltas);
 
-  document.getElementById('lista-sumido').innerHTML = rankingSumido.length && totalRealizados
-    ? rankingSumido.map(r => `
-        <li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.faltas}/${r.total} 👻</span></li>
-      `).join('')
+  const listaSumido = document.getElementById('lista-sumido');
+  if (listaSumido) listaSumido.innerHTML = rankingSumido.length && totalRealizados
+    ? rankingSumido.map(r => `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.faltas}/${r.total} 👻</span></li>`).join('')
     : '<p class="hint">Sem churrascos realizados ainda.</p>';
 }
 
@@ -246,7 +361,7 @@ function renderHome() {
   const proximos = churrascos.filter(c => !c.realizado && c.data >= hoje);
   const prox = proximos[0];
   const divProx = document.getElementById('proximo-churrasco');
-  divProx.innerHTML = prox
+  if (divProx) divProx.innerHTML = prox
     ? `<div class="evento-item" style="margin:0;">
          <div class="data">📅 ${formatarData(prox.data)} às ${prox.hora}</div>
          <div class="info">📍 ${escapeHtml(prox.local)}</div>
@@ -256,14 +371,16 @@ function renderHome() {
     : '<p class="hint">Nenhum churrasco agendado. Bora marcar um! 🔥</p>';
 
   const realizados = churrascos.filter(c => c.realizado);
-  document.getElementById('total-churrascos').textContent = realizados.length;
+  const elTotal = document.getElementById('total-churrascos');
+  if (elTotal) elTotal.textContent = realizados.length;
 
   const contagem = {};
   realizados.forEach(c => { contagem[c.responsavelId] = (contagem[c.responsavelId] || 0) + 1; });
   let mestre = null, max = 0;
   for (const id in contagem) if (contagem[id] > max) { max = contagem[id]; mestre = id; }
   const mestreObj = membros.find(m => m.id === mestre);
-  document.getElementById('mestre-churrasco').textContent = mestreObj ? `🥇 ${mestreObj.nome} (${max})` : '—';
+  const elMestre = document.getElementById('mestre-churrasco');
+  if (elMestre) elMestre.textContent = mestreObj ? `🥇 ${mestreObj.nome} (${max})` : '—';
 
   const faltas = {};
   realizados.forEach(c => {
@@ -273,118 +390,86 @@ function renderHome() {
   let sumido = null, maxF = 0;
   for (const id in faltas) if (faltas[id] > maxF) { maxF = faltas[id]; sumido = id; }
   const sumidoObj = membros.find(m => m.id === sumido);
-  document.getElementById('sumido-vez').textContent = sumidoObj && maxF > 0 ? `👻 ${sumidoObj.nome} (${maxF})` : '—';
+  const elSum = document.getElementById('sumido-vez');
+  if (elSum) elSum.textContent = sumidoObj && maxF > 0 ? `👻 ${sumidoObj.nome} (${maxF})` : '—';
 }
 
-// ===== GALERIA (COM IMGBB - GRÁTIS!) =====
-const formFoto = document.getElementById('form-foto');
-formFoto.addEventListener('submit', async (e) => {
+// ===== GALERIA (IMGBB) =====
+document.getElementById('form-foto').addEventListener('submit', async (e) => {
   e.preventDefault();
   const arquivo = document.getElementById('foto-arquivo').files[0];
   const legenda = document.getElementById('foto-legenda').value.trim();
   if (!arquivo) return;
-
-  // Validação de tamanho (ImgBB aceita até 32MB)
-  if (arquivo.size > 32 * 1024 * 1024) {
-    alert('❌ Foto muito grande! Máximo 32MB.');
-    return;
-  }
+  if (arquivo.size > 32 * 1024 * 1024) { alert('❌ Máximo 32MB'); return; }
 
   const status = document.getElementById('upload-status');
-  status.textContent = '📤 Enviando foto pro ImgBB...';
+  status.textContent = '📤 Enviando foto...';
 
   try {
-    // Monta o formulário pro ImgBB
     const formData = new FormData();
     formData.append('image', arquivo);
-
-    // Envia pro ImgBB
-    const response = await fetch(`${IMGBB_URL}?key=${IMGBB_API_KEY}`, {
-      method: 'POST',
-      body: formData
-    });
-
+    const response = await fetch(`${IMGBB_URL}?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
     const result = await response.json();
+    if (!result.success) throw new Error(result.error?.message || 'Erro no upload');
 
-    if (!result.success) {
-      throw new Error(result.error?.message || 'Erro no upload');
-    }
-
-    // Pega a URL da foto hospedada no ImgBB
-    const urlFoto = result.data.url;
-    const urlThumb = result.data.thumb?.url || urlFoto;
-    const deleteUrl = result.data.delete_url; // URL pra deletar no ImgBB (opcional)
-
-    // Salva só a URL no Firestore (texto leve, tudo grátis)
     await addDoc(collection(db, 'fotos'), {
-      url: urlFoto,
-      thumb: urlThumb,
-      deleteUrl,
+      url: result.data.url,
+      thumb: result.data.thumb?.url || result.data.url,
+      deleteUrl: result.data.delete_url,
       legenda,
+      criadoPor: currentUser.uid,
+      criadoPorNome: nomeAtual(),
       criadoEm: serverTimestamp()
     });
 
-    status.textContent = '✅ Foto enviada com sucesso!';
-    formFoto.reset();
+    status.textContent = '✅ Foto enviada!';
+    e.target.reset();
     setTimeout(() => status.textContent = '', 3000);
   } catch (err) {
-    console.error('Erro upload:', err);
+    console.error(err);
     status.textContent = '❌ Erro: ' + err.message;
   }
-});
-
-onSnapshot(query(collection(db, 'fotos'), orderBy('criadoEm', 'desc')), (snap) => {
-  fotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderGaleria();
 });
 
 function renderGaleria() {
   const grid = document.getElementById('galeria-grid');
   if (!fotos.length) {
-    grid.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora registrar os churrascos!</p>';
+    grid.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora registrar!</p>';
     return;
   }
-  grid.innerHTML = fotos.map(f => `
-    <div class="galeria-item" onclick="abrirFoto('${f.url}','${f.id}')">
-      <img src="${f.thumb || f.url}" alt="${escapeHtml(f.legenda||'')}" loading="lazy" />
-      ${f.legenda ? `<div class="legenda">${escapeHtml(f.legenda)}</div>` : ''}
-    </div>
-  `).join('');
+  grid.innerHTML = fotos.map(f => {
+    const podeExcluir = isAdmin || f.criadoPor === currentUser.uid;
+    return `
+      <div class="galeria-item">
+        <img src="${f.thumb || f.url}" alt="${escapeHtml(f.legenda||'')}" loading="lazy" onclick="window.open('${f.url}','_blank')" />
+        ${f.legenda ? `<div class="legenda">${escapeHtml(f.legenda)}</div>` : ''}
+        ${f.criadoPorNome ? `<div class="legenda" style="font-size:0.75rem;opacity:0.7;">📸 ${escapeHtml(f.criadoPorNome)}</div>` : ''}
+        ${podeExcluir ? `<button class="btn-excluir" style="margin:8px;" onclick="removerFoto('${f.id}')">🗑️</button>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
-window.abrirFoto = (url, id) => {
-  const acao = confirm('Deseja REMOVER esta foto da galeria?\n\n(Cancelar = apenas abrir em nova aba)');
-  if (acao) {
-    removerFoto(id);
-  } else {
-    window.open(url, '_blank');
-  }
+window.removerFoto = async (id) => {
+  const f = fotos.find(x => x.id === id);
+  if (!f) return;
+  if (!isAdmin && f.criadoPor !== currentUser.uid) return alert('🚫 Só quem enviou pode remover');
+  if (!confirm('Remover esta foto?')) return;
+  await deleteDoc(doc(db, 'fotos', id));
 };
 
-async function removerFoto(id) {
-  try {
-    await deleteDoc(doc(db, 'fotos', id));
-    // Nota: a foto continua no ImgBB, mas some da galeria. Sem custo.
-  } catch(e) {
-    console.error(e);
-    alert('Erro ao remover foto');
-  }
-}
-
-// ===== MURAL DE OFENSAS =====
-const formOfensa = document.getElementById('form-ofensa');
-formOfensa.addEventListener('submit', async (e) => {
+// ===== OFENSAS (nome automático do login) =====
+document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const autor = document.getElementById('ofensa-autor').value.trim();
   const texto = document.getElementById('ofensa-texto').value.trim();
-  if (!autor || !texto) return;
-  await addDoc(collection(db, 'ofensas'), { autor, texto, criadoEm: serverTimestamp() });
+  if (!texto) return;
+  await addDoc(collection(db, 'ofensas'), {
+    autor: nomeAtual(),
+    texto,
+    criadoPor: currentUser.uid,
+    criadoEm: serverTimestamp()
+  });
   document.getElementById('ofensa-texto').value = '';
-});
-
-onSnapshot(query(collection(db, 'ofensas'), orderBy('criadoEm', 'desc')), (snap) => {
-  ofensas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderOfensas();
 });
 
 function renderOfensas() {
@@ -395,18 +480,22 @@ function renderOfensas() {
   }
   lista.innerHTML = ofensas.map(o => {
     const data = o.criadoEm?.toDate ? o.criadoEm.toDate().toLocaleString('pt-BR') : '';
+    const podeExcluir = isAdmin || o.criadoPor === currentUser.uid;
     return `
       <div class="ofensa-item">
         <span class="data-ofensa">${data}</span>
         <span class="autor">${escapeHtml(o.autor)}</span>
         <div class="texto">${escapeHtml(o.texto)}</div>
-        <button class="btn-excluir" onclick="removerOfensa('${o.id}')" style="margin-top:8px;padding:4px 8px;font-size:0.75rem;">🗑️</button>
+        ${podeExcluir ? `<button class="btn-excluir" onclick="removerOfensa('${o.id}')" style="margin-top:8px;padding:4px 8px;font-size:0.75rem;">🗑️</button>` : ''}
       </div>
     `;
   }).join('');
 }
 
 window.removerOfensa = async (id) => {
+  const o = ofensas.find(x => x.id === id);
+  if (!o) return;
+  if (!isAdmin && o.criadoPor !== currentUser.uid) return alert('🚫 Só quem postou pode remover');
   if (!confirm('Remover esta ofensa?')) return;
   await deleteDoc(doc(db, 'ofensas', id));
 };
@@ -417,10 +506,8 @@ function formatarData(d) {
   const [ano, mes, dia] = d.split('-');
   return `${dia}/${mes}/${ano}`;
 }
-
 function escapeHtml(str) {
   if (str == null) return '';
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
