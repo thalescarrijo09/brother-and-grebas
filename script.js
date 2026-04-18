@@ -1,14 +1,11 @@
-// ===== FIREBASE IMPORTS (via CDN ES Modules) =====
+// ===== FIREBASE IMPORTS (apenas Firestore agora!) =====
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
+  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import {
-  getStorage, ref, uploadBytes, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-// ===== CONFIG =====
+// ===== CONFIG FIREBASE =====
 const firebaseConfig = {
   apiKey: "AIzaSyBiZmlRBN7kTnnsgwdXEcRN0pGwWNWBSt8",
   authDomain: "brothers-e-grebas.firebaseapp.com",
@@ -20,7 +17,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
+
+// ===== CONFIG IMGBB (hospedagem das fotos - GRÁTIS) =====
+const IMGBB_API_KEY = "b720bed751ebd8db5cf2d61b47abb2ba";
+const IMGBB_URL = "https://api.imgbb.com/1/upload";
 
 // ===== ESTADO LOCAL =====
 let membros = [];
@@ -203,7 +203,6 @@ function renderRankings() {
   const realizados = churrascos.filter(c => c.realizado);
   const totalRealizados = realizados.length;
 
-  // Ranking churrasqueiros
   const contagemChurras = {};
   realizados.forEach(c => {
     contagemChurras[c.responsavelId] = (contagemChurras[c.responsavelId] || 0) + 1;
@@ -219,7 +218,6 @@ function renderRankings() {
       `).join('')
     : '<p class="hint">Sem dados ainda.</p>';
 
-  // Ranking sumido (quem mais faltou)
   const contagemFaltas = {};
   realizados.forEach(c => {
     const presentes = c.presentes || [];
@@ -260,7 +258,6 @@ function renderHome() {
   const realizados = churrascos.filter(c => c.realizado);
   document.getElementById('total-churrascos').textContent = realizados.length;
 
-  // Mestre
   const contagem = {};
   realizados.forEach(c => { contagem[c.responsavelId] = (contagem[c.responsavelId] || 0) + 1; });
   let mestre = null, max = 0;
@@ -268,7 +265,6 @@ function renderHome() {
   const mestreObj = membros.find(m => m.id === mestre);
   document.getElementById('mestre-churrasco').textContent = mestreObj ? `🥇 ${mestreObj.nome} (${max})` : '—';
 
-  // Sumido
   const faltas = {};
   realizados.forEach(c => {
     const p = c.presentes || [];
@@ -280,7 +276,7 @@ function renderHome() {
   document.getElementById('sumido-vez').textContent = sumidoObj && maxF > 0 ? `👻 ${sumidoObj.nome} (${maxF})` : '—';
 }
 
-// ===== GALERIA =====
+// ===== GALERIA (COM IMGBB - GRÁTIS!) =====
 const formFoto = document.getElementById('form-foto');
 formFoto.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -288,22 +284,51 @@ formFoto.addEventListener('submit', async (e) => {
   const legenda = document.getElementById('foto-legenda').value.trim();
   if (!arquivo) return;
 
+  // Validação de tamanho (ImgBB aceita até 32MB)
+  if (arquivo.size > 32 * 1024 * 1024) {
+    alert('❌ Foto muito grande! Máximo 32MB.');
+    return;
+  }
+
   const status = document.getElementById('upload-status');
-  status.textContent = '📤 Enviando foto...';
+  status.textContent = '📤 Enviando foto pro ImgBB...';
 
   try {
-    const nomeArquivo = `fotos/${Date.now()}_${arquivo.name}`;
-    const fotoRef = ref(storage, nomeArquivo);
-    await uploadBytes(fotoRef, arquivo);
-    const url = await getDownloadURL(fotoRef);
-    await addDoc(collection(db, 'fotos'), {
-      url, legenda, caminho: nomeArquivo, criadoEm: serverTimestamp()
+    // Monta o formulário pro ImgBB
+    const formData = new FormData();
+    formData.append('image', arquivo);
+
+    // Envia pro ImgBB
+    const response = await fetch(`${IMGBB_URL}?key=${IMGBB_API_KEY}`, {
+      method: 'POST',
+      body: formData
     });
-    status.textContent = '✅ Foto enviada!';
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Erro no upload');
+    }
+
+    // Pega a URL da foto hospedada no ImgBB
+    const urlFoto = result.data.url;
+    const urlThumb = result.data.thumb?.url || urlFoto;
+    const deleteUrl = result.data.delete_url; // URL pra deletar no ImgBB (opcional)
+
+    // Salva só a URL no Firestore (texto leve, tudo grátis)
+    await addDoc(collection(db, 'fotos'), {
+      url: urlFoto,
+      thumb: urlThumb,
+      deleteUrl,
+      legenda,
+      criadoEm: serverTimestamp()
+    });
+
+    status.textContent = '✅ Foto enviada com sucesso!';
     formFoto.reset();
     setTimeout(() => status.textContent = '', 3000);
   } catch (err) {
-    console.error(err);
+    console.error('Erro upload:', err);
     status.textContent = '❌ Erro: ' + err.message;
   }
 });
@@ -320,20 +345,31 @@ function renderGaleria() {
     return;
   }
   grid.innerHTML = fotos.map(f => `
-    <div class="galeria-item" onclick="removerFoto('${f.id}','${f.caminho}')">
-      <img src="${f.url}" alt="${escapeHtml(f.legenda||'')}" />
+    <div class="galeria-item" onclick="abrirFoto('${f.url}','${f.id}')">
+      <img src="${f.thumb || f.url}" alt="${escapeHtml(f.legenda||'')}" loading="lazy" />
       ${f.legenda ? `<div class="legenda">${escapeHtml(f.legenda)}</div>` : ''}
     </div>
   `).join('');
 }
 
-window.removerFoto = async (id, caminho) => {
-  if (!confirm('Remover esta foto?')) return;
+window.abrirFoto = (url, id) => {
+  const acao = confirm('Deseja REMOVER esta foto da galeria?\n\n(Cancelar = apenas abrir em nova aba)');
+  if (acao) {
+    removerFoto(id);
+  } else {
+    window.open(url, '_blank');
+  }
+};
+
+async function removerFoto(id) {
   try {
     await deleteDoc(doc(db, 'fotos', id));
-    if (caminho) await deleteObject(ref(storage, caminho));
-  } catch(e) { console.error(e); }
-};
+    // Nota: a foto continua no ImgBB, mas some da galeria. Sem custo.
+  } catch(e) {
+    console.error(e);
+    alert('Erro ao remover foto');
+  }
+}
 
 // ===== MURAL DE OFENSAS =====
 const formOfensa = document.getElementById('form-ofensa');
