@@ -227,7 +227,26 @@
 
   </div>
 
+    <!-- ===== BRASAS FLUTUANTES ===== -->
+  <script>
+    // Cria partículas de brasa subindo
+    function criarBrasa() {
+      const ember = document.createElement('div');
+      ember.className = 'ember';
+      ember.style.left = Math.random() * 100 + 'vw';
+      ember.style.animationDuration = (Math.random() * 4 + 4) + 's';
+      ember.style.animationDelay = Math.random() * 2 + 's';
+      ember.style.width = (Math.random() * 4 + 2) + 'px';
+      ember.style.height = ember.style.width;
+      document.body.appendChild(ember);
+      setTimeout(() => ember.remove(), 8000);
+    }
+    setInterval(criarBrasa, 400);
+  </script>
+
   <!-- ===== SCRIPT (module) ===== -->
   <script type="module" src="script.js"></script>
+</body>
+
 </body>
 </html>
