@@ -458,47 +458,171 @@ window.removerFoto = async (id) => {
   await deleteDoc(doc(db, 'fotos', id));
 };
 
-// ===== OFENSAS (nome automático do login) =====
-document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const texto = document.getElementById('ofensa-texto').value.trim();
-  if (!texto) return;
-  await addDoc(collection(db, 'ofensas'), {
-    autor: nomeAtual(),
-    texto,
-    criadoPor: currentUser.uid,
-    criadoEm: serverTimestamp()
-  });
-  document.getElementById('ofensa-texto').value = '';
-});
+// ============================================
+// OFENSAS COM COMENTÁRIOS
+// ============================================
+function carregarOfensas() {
+  const q = query(collection(db, "ofensas"), orderBy("criadoEm", "desc"));
+  
+  onSnapshot(q, (snapshot) => {
+    const lista = document.getElementById("lista-ofensas");
+    
+    if (snapshot.empty) {
+      lista.innerHTML = '<p class="hint">Nenhuma ofensa ainda. Bora zoar a galera! 😈</p>';
+      return;
+    }
 
-function renderOfensas() {
-  const lista = document.getElementById('lista-ofensas');
-  if (!ofensas.length) {
-    lista.innerHTML = '<p class="hint">Nenhuma ofensa ainda. Seja o primeiro a zoar! 🤬</p>';
-    return;
-  }
-  lista.innerHTML = ofensas.map(o => {
-    const data = o.criadoEm?.toDate ? o.criadoEm.toDate().toLocaleString('pt-BR') : '';
-    const podeExcluir = isAdmin || o.criadoPor === currentUser.uid;
-    return `
-      <div class="ofensa-item">
-        <span class="data-ofensa">${data}</span>
-        <span class="autor">${escapeHtml(o.autor)}</span>
-        <div class="texto">${escapeHtml(o.texto)}</div>
-        ${podeExcluir ? `<button class="btn-excluir" onclick="removerOfensa('${o.id}')" style="margin-top:8px;padding:4px 8px;font-size:0.75rem;">🗑️</button>` : ''}
-      </div>
-    `;
-  }).join('');
+    lista.innerHTML = "";
+
+    snapshot.forEach((docSnap) => {
+      const ofensa = docSnap.data();
+      const ofensaId = docSnap.id;
+      const data = ofensa.criadoEm?.toDate?.() || new Date();
+      const dataFormatada = data.toLocaleString('pt-BR');
+      
+      const podeExcluir = isAdmin || (currentUser && ofensa.uid === currentUser.uid);
+
+      const div = document.createElement("div");
+      div.className = "ofensa-item";
+      div.innerHTML = `
+        <span class="data-ofensa">📅 ${dataFormatada}</span>
+        <span class="autor">${ofensa.autor || 'Anônimo'}</span>
+        <p class="texto">${escapeHtml(ofensa.texto)}</p>
+        
+        <div class="ofensa-acoes">
+          <button class="btn-comentar" data-id="${ofensaId}">💬 Responder</button>
+          <span class="contador-comentarios" id="contador-${ofensaId}">0 comentários</span>
+          ${podeExcluir ? `<button class="btn-excluir" data-id="${ofensaId}" data-tipo="ofensa">🗑️ Excluir</button>` : ''}
+        </div>
+
+        <div class="form-comentario hidden" id="form-${ofensaId}">
+          <textarea placeholder="✍️ Escreve sua resposta..." id="texto-${ofensaId}"></textarea>
+          <button class="btn-mini" data-id="${ofensaId}">🔥 Postar Resposta</button>
+        </div>
+
+        <div class="lista-comentarios" id="comentarios-${ofensaId}"></div>
+      `;
+      
+      lista.appendChild(div);
+
+      // Carrega os comentários dessa ofensa
+      carregarComentarios(ofensaId);
+    });
+
+    // ===== Listeners dos botões =====
+    
+    // Botão "Responder" (toggle do form)
+    document.querySelectorAll('.btn-comentar').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.dataset.id;
+        document.getElementById(`form-${id}`).classList.toggle('hidden');
+      });
+    });
+
+    // Botão "Postar Resposta"
+    document.querySelectorAll('.form-comentario .btn-mini').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const ofensaId = e.target.dataset.id;
+        const textarea = document.getElementById(`texto-${ofensaId}`);
+        const texto = textarea.value.trim();
+        
+        if (!texto) {
+          alert('Escreve algo aí, brother! 😅');
+          return;
+        }
+        
+        try {
+          await addDoc(collection(db, "ofensas", ofensaId, "comentarios"), {
+            texto: texto,
+            autor: currentUser.email.split('@')[0],
+            uid: currentUser.uid,
+            criadoEm: serverTimestamp()
+          });
+          textarea.value = '';
+          document.getElementById(`form-${ofensaId}`).classList.add('hidden');
+        } catch (err) {
+          console.error('Erro ao postar comentário:', err);
+          alert('Erro ao postar. Tenta de novo!');
+        }
+      });
+    });
+
+    // Botão "Excluir Ofensa"
+    document.querySelectorAll('.btn-excluir[data-tipo="ofensa"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (!confirm('Excluir essa ofensa e todos os comentários?')) return;
+        const id = e.target.dataset.id;
+        try {
+          await deleteDoc(doc(db, "ofensas", id));
+        } catch (err) {
+          console.error('Erro:', err);
+          alert('Erro ao excluir!');
+        }
+      });
+    });
+  });
 }
 
-window.removerOfensa = async (id) => {
-  const o = ofensas.find(x => x.id === id);
-  if (!o) return;
-  if (!isAdmin && o.criadoPor !== currentUser.uid) return alert('🚫 Só quem postou pode remover');
-  if (!confirm('Remover esta ofensa?')) return;
-  await deleteDoc(doc(db, 'ofensas', id));
-};
+// ============================================
+// CARREGAR COMENTÁRIOS DE UMA OFENSA
+// ============================================
+function carregarComentarios(ofensaId) {
+  const q = query(
+    collection(db, "ofensas", ofensaId, "comentarios"),
+    orderBy("criadoEm", "asc")
+  );
+
+  onSnapshot(q, (snapshot) => {
+    const container = document.getElementById(`comentarios-${ofensaId}`);
+    const contador = document.getElementById(`contador-${ofensaId}`);
+    
+    if (!container) return;
+
+    container.innerHTML = "";
+    contador.textContent = `💬 ${snapshot.size} ${snapshot.size === 1 ? 'comentário' : 'comentários'}`;
+
+    snapshot.forEach((docSnap) => {
+      const c = docSnap.data();
+      const cid = docSnap.id;
+      const data = c.criadoEm?.toDate?.() || new Date();
+      const dataFormatada = data.toLocaleString('pt-BR');
+      
+      const podeExcluir = isAdmin || (currentUser && c.uid === currentUser.uid);
+
+      const div = document.createElement("div");
+      div.className = "comentario-item";
+      div.innerHTML = `
+        <span class="autor-comentario">${c.autor || 'Anônimo'}</span>
+        <span class="data-comentario">${dataFormatada}</span>
+        <div class="texto-comentario">${escapeHtml(c.texto)}</div>
+        ${podeExcluir ? `<button class="btn-excluir-mini" data-ofensa="${ofensaId}" data-comentario="${cid}">✕</button>` : ''}
+      `;
+      container.appendChild(div);
+    });
+
+    // Listener dos botões de excluir comentário
+    container.querySelectorAll('.btn-excluir-mini').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (!confirm('Excluir esse comentário?')) return;
+        const ofId = e.target.dataset.ofensa;
+        const coId = e.target.dataset.comentario;
+        try {
+          await deleteDoc(doc(db, "ofensas", ofId, "comentarios", coId));
+        } catch (err) {
+          console.error('Erro:', err);
+        }
+      });
+    });
+  });
+}
+
+// Função auxiliar pra escapar HTML (segurança)
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 
 // ===== UTILS =====
 function formatarData(d) {
