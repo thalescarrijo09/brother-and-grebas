@@ -148,10 +148,7 @@ function iniciarListeners() {
     renderHome();
   }));
 
-  unsubscribes.push(onSnapshot(query(collection(db, 'ofensas'), orderBy('criadoEm', 'desc')), (snap) => {
-    ofensas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderOfensas();
-  }));
+ carregarOfensas();
 
   unsubscribes.push(onSnapshot(query(collection(db, 'fotos'), orderBy('criadoEm', 'desc')), (snap) => {
     fotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
