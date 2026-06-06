@@ -36,7 +36,6 @@ let isAdmin = false;
 let membros = [];
 let churrascos = [];
 let ofensas = [];
-let fotos = [];
 let unsubscribes = [];
 
 // ===== LOGIN =====
@@ -129,6 +128,21 @@ function nomeAtual() {
   return currentUser.displayName || currentUser.email.split('@')[0];
 }
 
+// ===== HELPER: upload de imagem para ImgBB (reutilizável) =====
+async function uploadImagemImgBB(arquivo) {
+  const formData = new FormData();
+  formData.append('image', arquivo);
+  const response = await fetch(`${IMGBB_URL}?key=${IMGBB_API_KEY}`, {
+    method: 'POST',
+    body: formData
+  });
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error?.message || 'Erro no upload da imagem');
+  }
+  return result.data.url;
+}
+
 // ===== LISTENERS =====
 function iniciarListeners() {
   unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
@@ -148,12 +162,7 @@ function iniciarListeners() {
     renderHome();
   }));
 
- carregarOfensas();
-
-  unsubscribes.push(onSnapshot(query(collection(db, 'fotos'), orderBy('criadoEm', 'desc')), (snap) => {
-    fotos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderGaleria();
-  }));
+  carregarOfensas();
 }
 
 // ===== MEMBROS (SÓ ADMIN) =====
@@ -391,86 +400,48 @@ function renderHome() {
   if (elSum) elSum.textContent = sumidoObj && maxF > 0 ? `👻 ${sumidoObj.nome} (${maxF})` : '—';
 }
 
-// ===== GALERIA (IMGBB) =====
-document.getElementById('form-foto').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const arquivo = document.getElementById('foto-arquivo').files[0];
-  const legenda = document.getElementById('foto-legenda').value.trim();
-  if (!arquivo) return;
-  if (arquivo.size > 32 * 1024 * 1024) { alert('❌ Máximo 32MB'); return; }
-
-  const status = document.getElementById('upload-status');
-  status.textContent = '📤 Enviando foto...';
-
-  try {
-    const formData = new FormData();
-    formData.append('image', arquivo);
-    const response = await fetch(`${IMGBB_URL}?key=${IMGBB_API_KEY}`, { method: 'POST', body: formData });
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error?.message || 'Erro no upload');
-
-    await addDoc(collection(db, 'fotos'), {
-      url: result.data.url,
-      thumb: result.data.thumb?.url || result.data.url,
-      deleteUrl: result.data.delete_url,
-      legenda,
-      criadoPor: currentUser.uid,
-      criadoPorNome: nomeAtual(),
-      criadoEm: serverTimestamp()
-    });
-
-    status.textContent = '✅ Foto enviada!';
-    e.target.reset();
-    setTimeout(() => status.textContent = '', 3000);
-  } catch (err) {
-    console.error(err);
-    status.textContent = '❌ Erro: ' + err.message;
-  }
-});
-
-function renderGaleria() {
-  const grid = document.getElementById('galeria-grid');
-  if (!fotos.length) {
-    grid.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora registrar!</p>';
-    return;
-  }
-  grid.innerHTML = fotos.map(f => {
-    const podeExcluir = isAdmin || f.criadoPor === currentUser.uid;
-    return `
-      <div class="galeria-item">
-        <img src="${f.thumb || f.url}" alt="${escapeHtml(f.legenda||'')}" loading="lazy" onclick="window.open('${f.url}','_blank')" />
-        ${f.legenda ? `<div class="legenda">${escapeHtml(f.legenda)}</div>` : ''}
-        ${f.criadoPorNome ? `<div class="legenda" style="font-size:0.75rem;opacity:0.7;">📸 ${escapeHtml(f.criadoPorNome)}</div>` : ''}
-        ${podeExcluir ? `<button class="btn-excluir" style="margin:8px;" onclick="removerFoto('${f.id}')">🗑️</button>` : ''}
-      </div>
-    `;
-  }).join('');
-}
-
-window.removerFoto = async (id) => {
-  const f = fotos.find(x => x.id === id);
-  if (!f) return;
-  if (!isAdmin && f.criadoPor !== currentUser.uid) return alert('🚫 Só quem enviou pode remover');
-  if (!confirm('Remover esta foto?')) return;
-  await deleteDoc(doc(db, 'fotos', id));
-};
-// ===== POSTAR OFENSA =====
+// ===== POSTAR OFENSA (COM FOTO OPCIONAL) =====
 document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
   e.preventDefault();
   const texto = document.getElementById('ofensa-texto').value.trim();
   if (!texto) return;
 
+  const inputFoto = document.getElementById('ofensa-foto');
+  const statusFoto = document.getElementById('ofensa-foto-status');
+  const btnPostar = document.getElementById('btn-postar-ofensa');
+  const arquivo = inputFoto?.files?.[0] || null;
+  let fotoUrl = null;
+
+  // Trava o botão pra não duplicar envio
+  if (btnPostar) btnPostar.disabled = true;
+
   try {
+    if (arquivo) {
+      if (arquivo.size > 32 * 1024 * 1024) {
+        alert('❌ Imagem muito grande. Máximo 32MB.');
+        if (btnPostar) btnPostar.disabled = false;
+        return;
+      }
+      if (statusFoto) statusFoto.textContent = '📤 Enviando imagem...';
+      fotoUrl = await uploadImagemImgBB(arquivo);
+    }
+
     await addDoc(collection(db, 'ofensas'), {
       texto,
+      fotoUrl, // null quando não há imagem
       autor: nomeAtual(),
       uid: currentUser.uid,
       criadoEm: serverTimestamp()
     });
+
     e.target.reset();
+    if (statusFoto) statusFoto.textContent = '';
   } catch (err) {
     console.error('Erro ao postar ofensa:', err);
     alert('Erro ao postar ofensa: ' + err.message);
+    if (statusFoto) statusFoto.textContent = '';
+  } finally {
+    if (btnPostar) btnPostar.disabled = false;
   }
 });
 
@@ -479,10 +450,10 @@ document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
 // ============================================
 function carregarOfensas() {
   const q = query(collection(db, "ofensas"), orderBy("criadoEm", "desc"));
-  
+
   onSnapshot(q, (snapshot) => {
     const lista = document.getElementById("lista-ofensas");
-    
+
     if (snapshot.empty) {
       lista.innerHTML = '<p class="hint">Nenhuma ofensa ainda. Bora zoar a galera! 😈</p>';
       return;
@@ -495,8 +466,13 @@ function carregarOfensas() {
       const ofensaId = docSnap.id;
       const data = ofensa.criadoEm?.toDate?.() || new Date();
       const dataFormatada = data.toLocaleString('pt-BR');
-      
+
       const podeExcluir = isAdmin || (currentUser && ofensa.uid === currentUser.uid);
+
+      // Renderiza a imagem só quando existir
+      const imagemHtml = ofensa.fotoUrl
+        ? `<img src="${ofensa.fotoUrl}" class="ofensa-img" alt="imagem da ofensa" loading="lazy" onclick="window.open('${ofensa.fotoUrl}','_blank')" />`
+        : '';
 
       const div = document.createElement("div");
       div.className = "ofensa-item";
@@ -504,7 +480,8 @@ function carregarOfensas() {
         <span class="data-ofensa">📅 ${dataFormatada}</span>
         <span class="autor">${ofensa.autor || 'Anônimo'}</span>
         <p class="texto">${escapeHtml(ofensa.texto)}</p>
-        
+        ${imagemHtml}
+
         <div class="ofensa-acoes">
           <button class="btn-comentar" data-id="${ofensaId}">💬 Responder</button>
           <span class="contador-comentarios" id="contador-${ofensaId}">0 comentários</span>
@@ -518,7 +495,7 @@ function carregarOfensas() {
 
         <div class="lista-comentarios" id="comentarios-${ofensaId}"></div>
       `;
-      
+
       lista.appendChild(div);
 
       // Carrega os comentários dessa ofensa
@@ -526,7 +503,7 @@ function carregarOfensas() {
     });
 
     // ===== Listeners dos botões =====
-    
+
     // Botão "Responder" (toggle do form)
     document.querySelectorAll('.btn-comentar').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -541,12 +518,12 @@ function carregarOfensas() {
         const ofensaId = e.target.dataset.id;
         const textarea = document.getElementById(`texto-${ofensaId}`);
         const texto = textarea.value.trim();
-        
+
         if (!texto) {
           alert('Escreve algo aí, brother! 😅');
           return;
         }
-        
+
         try {
           await addDoc(collection(db, "ofensas", ofensaId, "comentarios"), {
             texto: texto,
@@ -591,7 +568,7 @@ function carregarComentarios(ofensaId) {
   onSnapshot(q, (snapshot) => {
     const container = document.getElementById(`comentarios-${ofensaId}`);
     const contador = document.getElementById(`contador-${ofensaId}`);
-    
+
     if (!container) return;
 
     container.innerHTML = "";
@@ -602,7 +579,7 @@ function carregarComentarios(ofensaId) {
       const cid = docSnap.id;
       const data = c.criadoEm?.toDate?.() || new Date();
       const dataFormatada = data.toLocaleString('pt-BR');
-      
+
       const podeExcluir = isAdmin || (currentUser && c.uid === currentUser.uid);
 
       const div = document.createElement("div");
@@ -639,11 +616,9 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-
 // ===== UTILS =====
 function formatarData(d) {
   if (!d) return '';
   const [ano, mes, dia] = d.split('-');
   return `${dia}/${mes}/${ano}`;
 }
-
