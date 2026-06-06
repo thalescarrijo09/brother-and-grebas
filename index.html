@@ -46,7 +46,6 @@
         <button class="tab-btn" data-tab="ranking">🏆 Ranking</button>
         <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
         <button class="tab-btn" data-tab="presenca">✅ Presença</button>
-        <button class="tab-btn" data-tab="galeria">📸 Galeria</button>
         <button class="tab-btn" data-tab="ofensas">🤬 Mural de Ofensas</button>
         <button class="tab-btn admin-only hidden" data-tab="membros">👥 Membros</button>
       </nav>
@@ -156,36 +155,18 @@
         </div>
       </section>
 
-      <!-- ========== ABA GALERIA ========== -->
-      <section id="galeria" class="tab-content">
-        <div class="card">
-          <h2>📸 Enviar Foto</h2>
-          <form id="form-foto">
-            <input type="file" id="foto-arquivo" accept="image/*" required />
-            <input type="text" id="foto-legenda" placeholder="📝 Legenda (opcional)" />
-            <button type="submit">📤 Enviar Foto</button>
-            <p id="upload-status"></p>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>🖼️ Galeria do Grupo</h2>
-          <div id="galeria-grid">
-            <p class="hint">Carregando...</p>
-          </div>
-        </div>
-      </section>
-
       <!-- ========== ABA MURAL DE OFENSAS ========== -->
       <section id="ofensas" class="tab-content">
         <div class="card">
           <h2>🤬 Postar Ofensa</h2>
           <p class="hint" style="text-align:left; padding: 0 0 15px;">
-            Zoa quem merece! Sua ofensa vai ser postada com seu nome de login. 😈
+            Zoa quem merece! Sua ofensa vai ser postada com seu nome de login. Pode anexar uma foto se quiser. 😈
           </p>
           <form id="form-ofensa">
             <textarea id="ofensa-texto" placeholder="✍️ Escreve aí a ofensa..." required></textarea>
-            <button type="submit">🔥 Postar Ofensa</button>
+            <input type="file" id="ofensa-foto" accept="image/*" />
+            <p id="ofensa-foto-status"></p>
+            <button type="submit" id="btn-postar-ofensa">🔥 Postar Ofensa</button>
           </form>
         </div>
 
@@ -227,7 +208,7 @@
 
   </div>
 
-    <!-- ===== BRASAS FLUTUANTES ===== -->
+  <!-- ===== BRASAS FLUTUANTES ===== -->
   <script>
     // Cria partículas de brasa subindo
     function criarBrasa() {
@@ -246,7 +227,5 @@
 
   <!-- ===== SCRIPT (module) ===== -->
   <script type="module" src="script.js"></script>
-</body>
-
 </body>
 </html>
