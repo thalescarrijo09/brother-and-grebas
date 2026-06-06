@@ -210,14 +210,12 @@ function renderSelectResponsavel() {
 document.getElementById('form-agenda').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = document.getElementById('churrasco-data').value;
-  const hora = document.getElementById('churrasco-hora').value;
-  const local = document.getElementById('churrasco-local').value.trim();
   const responsavelId = document.getElementById('churrasco-responsavel').value;
   const obs = document.getElementById('churrasco-obs').value.trim();
   const responsavel = membros.find(m => m.id === responsavelId);
 
   await addDoc(collection(db, 'churrascos'), {
-    data, hora, local,
+    data,
     responsavelId,
     responsavelNome: responsavel ? responsavel.nome : 'Desconhecido',
     obs,
@@ -243,8 +241,7 @@ function renderAgenda() {
     const podeExcluir = isAdmin || c.criadoPor === currentUser.uid;
     return `
       <div class="evento-item">
-        <div class="data">📅 ${formatarData(c.data)} às ${c.hora}</div>
-        <div class="info">📍 ${escapeHtml(c.local)}</div>
+        <div class="data">📅 ${formatarData(c.data)}</div>
         <div class="info">🔥 Churrasqueiro: <strong>${escapeHtml(c.responsavelNome)}</strong></div>
         ${c.obs ? `<div class="info">📝 ${escapeHtml(c.obs)}</div>` : ''}
         ${c.criadoPorNome ? `<div class="info" style="font-size:0.8rem;opacity:0.7;">— agendado por ${escapeHtml(c.criadoPorNome)}</div>` : ''}
@@ -270,7 +267,7 @@ function renderHistorico() {
     return `
       <div class="evento-item">
         <div class="data">✅ ${formatarData(c.data)}</div>
-        <div class="info">📍 ${escapeHtml(c.local)} — 🔥 ${escapeHtml(c.responsavelNome)}</div>
+        <div class="info">🔥 ${escapeHtml(c.responsavelNome)}</div>
         <div class="info">👥 Presentes (${(c.presentes||[]).length}): ${escapeHtml(presentesNomes) || '—'}</div>
         ${podeExcluir ? `<button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>` : ''}
       </div>
@@ -294,7 +291,7 @@ function renderSelectPresenca() {
   if (!sel) return;
   const naoRealizados = churrascos.filter(c => !c.realizado);
   sel.innerHTML = '<option value="">Selecione o churrasco...</option>' +
-    naoRealizados.map(c => `<option value="${c.id}">${formatarData(c.data)} — ${escapeHtml(c.local)}</option>`).join('');
+    naoRealizados.map(c => `<option value="${c.id}">${formatarData(c.data)} — ${escapeHtml(c.responsavelNome)}</option>`).join('');
 }
 
 document.getElementById('select-churrasco-presenca').addEventListener('change', (e) => {
@@ -369,8 +366,7 @@ function renderHome() {
   const divProx = document.getElementById('proximo-churrasco');
   if (divProx) divProx.innerHTML = prox
     ? `<div class="evento-item" style="margin:0;">
-         <div class="data">📅 ${formatarData(prox.data)} às ${prox.hora}</div>
-         <div class="info">📍 ${escapeHtml(prox.local)}</div>
+         <div class="data">📅 ${formatarData(prox.data)}</div>
          <div class="info">🔥 Churrasqueiro: <strong>${escapeHtml(prox.responsavelNome)}</strong></div>
          ${prox.obs ? `<div class="info">📝 ${escapeHtml(prox.obs)}</div>` : ''}
        </div>`
