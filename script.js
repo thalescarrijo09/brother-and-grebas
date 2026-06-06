@@ -457,6 +457,25 @@ window.removerFoto = async (id) => {
   if (!confirm('Remover esta foto?')) return;
   await deleteDoc(doc(db, 'fotos', id));
 };
+// ===== POSTAR OFENSA =====
+document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const texto = document.getElementById('ofensa-texto').value.trim();
+  if (!texto) return;
+
+  try {
+    await addDoc(collection(db, 'ofensas'), {
+      texto,
+      autor: nomeAtual(),
+      uid: currentUser.uid,
+      criadoEm: serverTimestamp()
+    });
+    e.target.reset();
+  } catch (err) {
+    console.error('Erro ao postar ofensa:', err);
+    alert('Erro ao postar ofensa: ' + err.message);
+  }
+});
 
 // ============================================
 // OFENSAS COM COMENTÁRIOS
