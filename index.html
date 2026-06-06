@@ -110,9 +110,7 @@
         <div class="card">
           <h2>📅 Agendar Churrasco</h2>
           <form id="form-agenda">
-            <input type="date" id="churrasco-data" required />
-            <input type="time" id="churrasco-hora" required />
-            <input type="text" id="churrasco-local" placeholder="📍 Local do churrasco" required />
+            <input type="date" id="churrasco-data" required onclick="try { this.showPicker(); } catch (e) {}" />
             <select id="churrasco-responsavel" required>
               <option value="">Churrasqueiro responsável...</option>
             </select>
