@@ -986,6 +986,7 @@ button[type="submit"]:hover,
     padding: 5px 10px;
     font-size: 0.8rem;
   }
+ }
   /* ===== MURAL DE FOTOS (GALERIA) ===== */
 .galeria-fotos {
   display: grid;
