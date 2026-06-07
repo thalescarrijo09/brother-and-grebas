@@ -990,7 +990,7 @@ button[type="submit"]:hover,
   /* ===== MURAL DE FOTOS (GALERIA) ===== */
 .galeria-fotos {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150pxpx, 1fr));
   gap: 15px;
   margin-top: 15px;
 }
