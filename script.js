@@ -8,12 +8,10 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import {
   getAuth,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
 
 
 // ===== CONFIG FIREBASE =====
@@ -71,43 +69,8 @@ formLogin.addEventListener('submit', async (e) => {
     loginErro.textContent = msgs[err.code] || 'Erro ao entrar. Tenta de novo.';
   }
 });
-const formUsuario = document.getElementById('form-usuario');
-const usuarioStatus = document.getElementById('usuario-status');
 
-formUsuario.addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const nome  = document.getElementById('usuario-nome').value.trim();
-  const email = document.getElementById('usuario-email').value.trim();
-  const senha = document.getElementById('usuario-senha').value;
-
-  usuarioStatus.style.color = '#ff7a33';
-  usuarioStatus.textContent = 'Criando conta...';
-
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, email, senha);
-
-    // grava o nome no perfil do Auth
-    await updateProfile(cred.user, { displayName: nome });
-
-    // TODO: aqui você grava o membro no Firestore/Realtime DB,
-    // usando cred.user.uid como chave, se for o caso.
-
-    usuarioStatus.style.color = '#7aff7a';
-    usuarioStatus.textContent = `Conta de ${nome} criada!`;
-    formUsuario.reset();
-  } catch (err) {
-    console.error(err);
-    const msgs = {
-      'auth/email-already-in-use': 'Esse email já tem conta',
-      'auth/invalid-email': 'Email inválido',
-      'auth/weak-password': 'Senha fraca (mín. 6 caracteres)'
-    };
-    usuarioStatus.style.color = '#ff7a33';
-    usuarioStatus.textContent = msgs[err.code] || 'Erro ao criar conta.';
-  }
-});
-
+// ===== LOGOUT (listener único) =====
 document.getElementById('btn-logout').addEventListener('click', async () => {
   if (!confirm('Sair da conta?')) return;
   await signOut(auth);
@@ -189,15 +152,14 @@ async function uploadImagemImgBB(arquivo) {
 
 // ===== LISTENERS =====
 function iniciarListeners() {
-unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
-  membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderMembros();
-  renderMembrosAdmin();          // <-- adicione esta linha
-  renderSelectResponsavel();
-  renderSelectPresenca();
-  renderRankings();
-}));
-
+  unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
+    membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMembros();
+    renderMembrosAdmin();
+    renderSelectResponsavel();
+    renderSelectPresenca();
+    renderRankings();
+  }));
 
   unsubscribes.push(onSnapshot(query(collection(db, 'churrascos'), orderBy('data', 'asc')), (snap) => {
     churrascos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -224,7 +186,9 @@ document.getElementById('form-membro').addEventListener('submit', async (e) => {
   });
   document.getElementById('membro-nome').value = '';
 });
+
 // ===== CADASTRAR USUÁRIO (CONTA + MEMBRO) — SÓ ADMIN =====
+// Listener único: usa instância secundária pra NÃO deslogar o admin.
 document.getElementById('form-usuario').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!isAdmin) { alert('🚫 Só o admin pode cadastrar usuários!'); return; }
@@ -235,6 +199,7 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
   const status = document.getElementById('usuario-status');
   if (!nome || !email || !senha) return;
 
+  status.style.color = '#ff7a33';
   status.textContent = '⏳ Criando conta...';
 
   // Segunda instância: cria a conta SEM trocar a sessão do admin
@@ -254,6 +219,7 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
       criadoEm: serverTimestamp()
     });
 
+    status.style.color = '#7aff7a';
     status.textContent = '✅ Conta e membro criados!';
     e.target.reset();
   } catch (err) {
@@ -263,6 +229,7 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
       'auth/invalid-email': 'Email inválido.',
       'auth/weak-password': 'Senha fraca (mínimo 6 caracteres).'
     };
+    status.style.color = '#ff7a33';
     status.textContent = '❌ ' + (msgs[err.code] || err.message);
   } finally {
     // Desliga a sessão secundária e descarta o app, sem afetar o admin
@@ -285,6 +252,7 @@ function renderMembros() {
     </span>
   `).join('');
 }
+
 // ===== LISTA DE MEMBROS COM EXCLUSÃO DE DADOS (SÓ ADMIN) =====
 function renderMembrosAdmin() {
   const lista = document.getElementById('lista-membros-admin');
@@ -604,7 +572,7 @@ document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
 function carregarOfensas() {
   const q = query(collection(db, "ofensas"), orderBy("criadoEm", "desc"));
 
-  onSnapshot(q, (snapshot) => {
+  const unsub = onSnapshot(q, (snapshot) => {
     const lista = document.getElementById("lista-ofensas");
 
     if (snapshot.empty) {
@@ -707,6 +675,8 @@ function carregarOfensas() {
       });
     });
   });
+
+  unsubscribes.push(unsub);
 }
 
 // ============================================
@@ -725,7 +695,9 @@ function carregarComentarios(ofensaId) {
     if (!container) return;
 
     container.innerHTML = "";
-    contador.textContent = `💬 ${snapshot.size} ${snapshot.size === 1 ? 'comentário' : 'comentários'}`;
+    if (contador) {
+      contador.textContent = `💬 ${snapshot.size} ${snapshot.size === 1 ? 'comentário' : 'comentários'}`;
+    }
 
     snapshot.forEach((docSnap) => {
       const c = docSnap.data();
