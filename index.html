@@ -47,6 +47,7 @@
         <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
         <button class="tab-btn" data-tab="presenca">✅ Presença</button>
         <button class="tab-btn" data-tab="ofensas">🤬 Mural de Ofensas</button>
+        <button class="tab-btn admin-only hidden" data-tab="financeiro">💰 Financeiro</button>
         <button class="tab-btn admin-only hidden" data-tab="usuarios">🔐 Usuários</button>
       </nav>
     </header>
@@ -77,6 +78,11 @@
             <div class="stat-card">
               <div class="label">Sumido da Vez</div>
               <div class="value" id="sumido-vez">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">💰 Caixinha</div>
+              <div class="value" id="caixinha-saldo">—</div>
+              <div class="label" id="caixinha-data" style="margin-top:6px;font-size:0.75rem;opacity:0.7;"></div>
             </div>
           </div>
         </div>
@@ -176,6 +182,22 @@
         </div>
       </section>
 
+      <!-- ========== ABA FINANCEIRO (SÓ ADMIN) ========== -->
+      <section id="financeiro" class="tab-content">
+        <div class="card">
+          <h2>💰 Saldo da Caixinha</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Atualize o saldo atual da caixinha. O valor e a data aparecem no Início pra todos verem.
+          </p>
+          <form id="form-financeiro">
+            <input type="number" step="0.01" id="financeiro-saldo" placeholder="💵 Saldo atual (ex: 350.00)" required />
+            <button type="submit">💾 Salvar Saldo</button>
+            <p id="financeiro-status" class="login-erro" style="color:#7aff7a;"></p>
+          </form>
+          <div id="financeiro-atual" style="margin-top:15px;"></div>
+        </div>
+      </section>
+
       <!-- ========== ABA USUÁRIOS (SÓ ADMIN) ========== -->
       <section id="usuarios" class="tab-content">
         <div class="card">
@@ -190,6 +212,26 @@
             <button type="submit">➕ Criar Conta + Membro</button>
             <p id="usuario-status" class="login-erro" style="color:#ff7a33;"></p>
           </form>
+        </div>
+
+        <div class="card">
+          <h2>👥 Cadastrar Dupla</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Junte dois membros numa dupla. Ela aparece como opção de churrasqueiro responsável e disputa o ranking.
+          </p>
+          <form id="form-dupla">
+            <select id="dupla-membro1" required>
+              <option value="">Membro 1...</option>
+            </select>
+            <select id="dupla-membro2" required>
+              <option value="">Membro 2...</option>
+            </select>
+            <button type="submit">➕ Criar Dupla</button>
+            <p id="dupla-status" class="login-erro" style="color:#ff7a33;"></p>
+          </form>
+          <div id="lista-duplas-admin" style="margin-top:15px;">
+            <p class="hint">Carregando...</p>
+          </div>
         </div>
 
         <div class="card">
@@ -214,7 +256,6 @@
 
   <!-- ===== BRASAS FLUTUANTES ===== -->
   <script>
-    // Cria partículas de brasa subindo
     function criarBrasa() {
       const ember = document.createElement('div');
       ember.className = 'ember';
