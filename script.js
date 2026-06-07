@@ -29,7 +29,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // ===== CONFIG ADMIN =====
-const ADMIN_UID = "DJtE0gEcDRd4JFARFxAobJshd8j1";
+const ADMIN_UID = "k3M4PRRdjaXxm2VbNGOyNsR6HoF2";
 
 // ===== CONFIG IMGBB =====
 const IMGBB_API_KEY = "b720bed751ebd8db5cf2d61b47abb2ba";
