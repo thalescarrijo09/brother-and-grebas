@@ -237,14 +237,14 @@ function renderSelectMembrosDupla() {
 
 document.getElementById('form-dupla').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar duplas!'); return; }
+  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar casais!'); return; }
 
   const id1 = document.getElementById('dupla-membro1').value;
   const id2 = document.getElementById('dupla-membro2').value;
   const status = document.getElementById('dupla-status');
 
   if (!id1 || !id2) { status.textContent = '❌ Escolha os dois membros.'; return; }
-  if (id1 === id2) { status.textContent = '❌ A dupla precisa de dois membros diferentes.'; return; }
+  if (id1 === id2) { status.textContent = '❌ O casal precisa de dois membros diferentes.'; return; }
 
   const m1 = membros.find(m => m.id === id1);
   const m2 = membros.find(m => m.id === id2);
@@ -255,7 +255,7 @@ document.getElementById('form-dupla').addEventListener('submit', async (e) => {
     (d.membro1Id === id1 && d.membro2Id === id2) ||
     (d.membro1Id === id2 && d.membro2Id === id1)
   );
-  if (jaExiste) { status.textContent = '❌ Essa dupla já existe.'; return; }
+  if (jaExiste) { status.textContent = '❌ Essa casal já existe.'; return; }
 
   try {
     await addDoc(collection(db, 'duplas'), {
@@ -266,7 +266,7 @@ document.getElementById('form-dupla').addEventListener('submit', async (e) => {
       criadoEm: serverTimestamp()
     });
     status.style.color = '#7aff7a';
-    status.textContent = '✅ Dupla criada!';
+    status.textContent = '✅ Casal criado!';
     e.target.reset();
   } catch (err) {
     console.error(err);
@@ -280,7 +280,7 @@ function renderDuplasAdmin() {
   if (!lista) return;
   if (!isAdmin) { lista.innerHTML = ''; return; }
   if (!duplas.length) {
-    lista.innerHTML = '<p class="hint">Nenhuma dupla cadastrada.</p>';
+    lista.innerHTML = '<p class="hint">Nenhum casal cadastrado.</p>';
     return;
   }
   lista.innerHTML = duplas.map(d => `
@@ -295,7 +295,7 @@ window.excluirDupla = async (duplaId) => {
   if (!isAdmin) return alert('🚫 Só admin.');
   const d = duplas.find(x => x.id === duplaId);
   if (!d) return;
-  if (!confirm(`Excluir a dupla "${d.nome}"?\n\nOs churrascos já realizados por ela continuam no histórico e no ranking.`)) return;
+  if (!confirm(`Excluir o casal "${d.nome}"?\n\nOs churrascos já realizados por ela continuam no histórico e no ranking.`)) return;
   try {
     await deleteDoc(doc(db, 'duplas', duplaId));
   } catch (err) {
@@ -327,8 +327,8 @@ window.excluirDadosMembro = async (membroId) => {
   if (!m) return;
 
   const aviso = m.uid
-    ? `Excluir "${m.nome}" e TODOS os dados dele (ofensas, comentários, presença)?\n\n⚠️ O LOGIN continua no console do Firebase. Remova manualmente lá.\n\nAs duplas que incluem esse membro também serão apagadas.`
-    : `Excluir "${m.nome}" e os dados de presença dele?\n\nAs duplas que incluem esse membro também serão apagadas.`;
+    ? `Excluir "${m.nome}" e TODOS os dados dele (ofensas, comentários, presença)?\n\n⚠️ O LOGIN continua no console do Firebase. Remova manualmente lá.\n\nOs casais que incluem esse membro também serão apagadas.`
+    : `Excluir "${m.nome}" e os dados de presença dele?\n\nOs casais que incluem esse membro também serão apagadas.`;
   if (!confirm(aviso)) return;
 
   try {
@@ -378,7 +378,7 @@ function renderSelectResponsavel() {
   const sel = document.getElementById('churrasco-responsavel');
   if (!sel) return;
   const optDuplas = duplas.length
-    ? `<optgroup label="👥 Duplas">${duplas.map(d => `<option value="dupla:${d.id}">${escapeHtml(d.nome)}</option>`).join('')}</optgroup>`
+    ? `<optgroup label="👥 Casais">${duplas.map(d => `<option value="dupla:${d.id}">${escapeHtml(d.nome)}</option>`).join('')}</optgroup>`
     : '';
   const optMembros = membros.length
     ? `<optgroup label="👤 Avulsos">${membros.map(m => `<option value="membro:${m.id}">${escapeHtml(m.nome)}</option>`).join('')}</optgroup>`
@@ -399,7 +399,7 @@ document.getElementById('form-agenda').addEventListener('submit', async (e) => {
   let nomeResp = 'Desconhecido';
   if (tipo === 'dupla') {
     const d = duplas.find(x => x.id === idResp);
-    nomeResp = d ? d.nome : 'Dupla removida';
+    nomeResp = d ? d.nome : 'Casal removido';
   } else {
     const m = membros.find(x => x.id === idResp);
     nomeResp = m ? m.nome : 'Membro removido';
