@@ -1,12 +1,20 @@
 // ===== FIREBASE IMPORTS =====
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
-  onSnapshot, query, orderBy, serverTimestamp
+  onSnapshot, query, orderBy, serverTimestamp,
+  getDocs, where, writeBatch, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/10.x.x/firebase-auth.js";
+
+
 
 // ===== CONFIG FIREBASE =====
 const firebaseConfig = {
@@ -61,6 +69,42 @@ formLogin.addEventListener('submit', async (e) => {
       'auth/too-many-requests': 'Muitas tentativas. Tenta mais tarde.'
     };
     loginErro.textContent = msgs[err.code] || 'Erro ao entrar. Tenta de novo.';
+  }
+});
+const formUsuario = document.getElementById('form-usuario');
+const usuarioStatus = document.getElementById('usuario-status');
+
+formUsuario.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const nome  = document.getElementById('usuario-nome').value.trim();
+  const email = document.getElementById('usuario-email').value.trim();
+  const senha = document.getElementById('usuario-senha').value;
+
+  usuarioStatus.style.color = '#ff7a33';
+  usuarioStatus.textContent = 'Criando conta...';
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, senha);
+
+    // grava o nome no perfil do Auth
+    await updateProfile(cred.user, { displayName: nome });
+
+    // TODO: aqui você grava o membro no Firestore/Realtime DB,
+    // usando cred.user.uid como chave, se for o caso.
+
+    usuarioStatus.style.color = '#7aff7a';
+    usuarioStatus.textContent = `Conta de ${nome} criada!`;
+    formUsuario.reset();
+  } catch (err) {
+    console.error(err);
+    const msgs = {
+      'auth/email-already-in-use': 'Esse email já tem conta',
+      'auth/invalid-email': 'Email inválido',
+      'auth/weak-password': 'Senha fraca (mín. 6 caracteres)'
+    };
+    usuarioStatus.style.color = '#ff7a33';
+    usuarioStatus.textContent = msgs[err.code] || 'Erro ao criar conta.';
   }
 });
 
@@ -145,13 +189,15 @@ async function uploadImagemImgBB(arquivo) {
 
 // ===== LISTENERS =====
 function iniciarListeners() {
-  unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
-    membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderMembros();
-    renderSelectResponsavel();
-    renderSelectPresenca();
-    renderRankings();
-  }));
+unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
+  membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderMembros();
+  renderMembrosAdmin();          // <-- adicione esta linha
+  renderSelectResponsavel();
+  renderSelectPresenca();
+  renderRankings();
+}));
+
 
   unsubscribes.push(onSnapshot(query(collection(db, 'churrascos'), orderBy('data', 'asc')), (snap) => {
     churrascos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -178,6 +224,53 @@ document.getElementById('form-membro').addEventListener('submit', async (e) => {
   });
   document.getElementById('membro-nome').value = '';
 });
+// ===== CADASTRAR USUÁRIO (CONTA + MEMBRO) — SÓ ADMIN =====
+document.getElementById('form-usuario').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar usuários!'); return; }
+
+  const nome   = document.getElementById('usuario-nome').value.trim();
+  const email  = document.getElementById('usuario-email').value.trim();
+  const senha  = document.getElementById('usuario-senha').value;
+  const status = document.getElementById('usuario-status');
+  if (!nome || !email || !senha) return;
+
+  status.textContent = '⏳ Criando conta...';
+
+  // Segunda instância: cria a conta SEM trocar a sessão do admin
+  const secApp  = initializeApp(firebaseConfig, 'secundario-' + Date.now());
+  const secAuth = getAuth(secApp);
+
+  try {
+    const cred = await createUserWithEmailAndPassword(secAuth, email, senha);
+    const novoUid = cred.user.uid;
+
+    // Cria o membro vinculado ao uid da conta nova (usa o db da sessão do admin)
+    await addDoc(collection(db, 'membros'), {
+      nome,
+      uid: novoUid,
+      email,
+      criadoPor: currentUser.uid,
+      criadoEm: serverTimestamp()
+    });
+
+    status.textContent = '✅ Conta e membro criados!';
+    e.target.reset();
+  } catch (err) {
+    console.error(err);
+    const msgs = {
+      'auth/email-already-in-use': 'Esse email já tem conta.',
+      'auth/invalid-email': 'Email inválido.',
+      'auth/weak-password': 'Senha fraca (mínimo 6 caracteres).'
+    };
+    status.textContent = '❌ ' + (msgs[err.code] || err.message);
+  } finally {
+    // Desliga a sessão secundária e descarta o app, sem afetar o admin
+    await signOut(secAuth).catch(() => {});
+    await deleteApp(secApp).catch(() => {});
+  }
+});
+
 
 function renderMembros() {
   const lista = document.getElementById('lista-membros');
@@ -192,6 +285,70 @@ function renderMembros() {
     </span>
   `).join('');
 }
+// ===== LISTA DE MEMBROS COM EXCLUSÃO DE DADOS (SÓ ADMIN) =====
+function renderMembrosAdmin() {
+  const lista = document.getElementById('lista-membros-admin');
+  if (!lista) return;
+  if (!isAdmin) { lista.innerHTML = ''; return; }
+  if (!membros.length) {
+    lista.innerHTML = '<p class="hint">Nenhum membro cadastrado.</p>';
+    return;
+  }
+  lista.innerHTML = membros.map(m => `
+    <div class="evento-item" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>👤 <strong>${escapeHtml(m.nome)}</strong>${m.email ? ` <span style="opacity:.6;font-size:.85rem;">(${escapeHtml(m.email)})</span>` : ''}${m.uid ? '' : ' <span style="opacity:.5;font-size:.75rem;">[sem login]</span>'}</span>
+      <button class="btn-excluir" onclick="excluirDadosMembro('${m.id}')">🗑️ Excluir dados</button>
+    </div>
+  `).join('');
+}
+
+// Apaga o membro e tudo ligado a ele
+window.excluirDadosMembro = async (membroId) => {
+  if (!isAdmin) return alert('🚫 Só admin.');
+  const m = membros.find(x => x.id === membroId);
+  if (!m) return;
+
+  const aviso = m.uid
+    ? `Excluir "${m.nome}" e TODOS os dados dele (ofensas, comentários, presença)?\n\n⚠️ O LOGIN continua no console do Firebase. Remova manualmente lá.`
+    : `Excluir "${m.nome}" e os dados de presença dele?`;
+  if (!confirm(aviso)) return;
+
+  try {
+    // 1) Remove a presença desse membro de todos os churrascos
+    const churrasSnap = await getDocs(collection(db, 'churrascos'));
+    const batch = writeBatch(db);
+    churrasSnap.forEach(cDoc => {
+      const c = cDoc.data();
+      if ((c.presentes || []).includes(membroId)) {
+        batch.update(cDoc.ref, { presentes: arrayRemove(membroId) });
+      }
+    });
+    await batch.commit();
+
+    // 2) Se tiver uid, apaga ofensas e comentários do usuário
+    if (m.uid) {
+      const ofensasSnap = await getDocs(
+        query(collection(db, 'ofensas'), where('uid', '==', m.uid))
+      );
+      for (const ofDoc of ofensasSnap.docs) {
+        // apaga comentários da ofensa antes da ofensa
+        const comSnap = await getDocs(collection(db, 'ofensas', ofDoc.id, 'comentarios'));
+        for (const com of comSnap.docs) {
+          await deleteDoc(doc(db, 'ofensas', ofDoc.id, 'comentarios', com.id));
+        }
+        await deleteDoc(doc(db, 'ofensas', ofDoc.id));
+      }
+    }
+
+    // 3) Apaga o documento do membro
+    await deleteDoc(doc(db, 'membros', membroId));
+
+    alert('✅ Dados do membro excluídos. Lembra de remover o login no console do Firebase.');
+  } catch (err) {
+    console.error('Erro ao excluir dados do membro:', err);
+    alert('Erro: ' + err.message);
+  }
+};
 
 window.removerMembro = async (id) => {
   if (!isAdmin) return alert('🚫 Só admin remove membros');
