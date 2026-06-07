@@ -29,7 +29,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // ===== CONFIG ADMIN =====
-const ADMIN_UID = "k3M4PRRdjaXxm2VbNGOyNsR6HoF2";
+const ADMIN_UID = "DJtE0gEcDRd4JFARFxAobJshd8j1";
 
 // ===== CONFIG IMGBB =====
 const IMGBB_API_KEY = "b720bed751ebd8db5cf2d61b47abb2ba";
@@ -175,7 +175,8 @@ function iniciarListeners() {
     renderFinanceiroAdmin(dados);
   }));
 
-  carregarOfensas();
+  carregarOfensas();  carregarFotos();
+
 }
 
 // ===== CADASTRAR USUÁRIO (CONTA + MEMBRO) — SÓ ADMIN =====
@@ -865,6 +866,210 @@ function carregarComentarios(ofensaId) {
     });
   });
 }
+// ============================================
+// MURAL DE FOTOS
+// ============================================
+const modalAddFoto = document.getElementById('modal-add-foto');
+const modalVerFoto = document.getElementById('modal-ver-foto');
+let arquivoFotoSelecionado = null;
+
+document.getElementById('btn-nova-foto').addEventListener('click', () => {
+  modalAddFoto.classList.remove('hidden');
+});
+document.getElementById('fechar-add-foto').addEventListener('click', fecharModalAddFoto);
+modalAddFoto.addEventListener('click', (e) => {
+  if (e.target === modalAddFoto) fecharModalAddFoto();
+});
+
+function fecharModalAddFoto() {
+  modalAddFoto.classList.add('hidden');
+  document.getElementById('form-foto').reset();
+  arquivoFotoSelecionado = null;
+  document.getElementById('foto-preview').classList.add('hidden');
+  document.getElementById('foto-dropzone-texto').classList.remove('hidden');
+  document.getElementById('foto-status').textContent = '';
+}
+
+// Prévia da imagem selecionada
+document.getElementById('foto-arquivo').addEventListener('change', (e) => {
+  const arquivo = e.target.files?.[0];
+  if (!arquivo) return;
+  arquivoFotoSelecionado = arquivo;
+  const preview = document.getElementById('foto-preview');
+  preview.src = URL.createObjectURL(arquivo);
+  preview.classList.remove('hidden');
+  document.getElementById('foto-dropzone-texto').classList.add('hidden');
+});
+
+// Postar foto
+document.getElementById('form-foto').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const arquivo = arquivoFotoSelecionado;
+  const legenda = document.getElementById('foto-legenda').value.trim();
+  const status = document.getElementById('foto-status');
+  const btn = document.getElementById('btn-postar-foto');
+
+  if (!arquivo) { status.textContent = '❌ Selecione uma foto.'; return; }
+  if (arquivo.size > 32 * 1024 * 1024) { status.textContent = '❌ Imagem muito grande (máx. 32MB).'; return; }
+
+  btn.disabled = true;
+  status.style.color = '#ff7a33';
+  status.textContent = '📤 Enviando foto...';
+
+  try {
+    const fotoUrl = await uploadImagemImgBB(arquivo);
+    await addDoc(collection(db, 'fotos'), {
+      fotoUrl,
+      legenda: legenda || 'Sem legenda',
+      autor: nomeAtual(),
+      uid: currentUser.uid,
+      criadoEm: serverTimestamp()
+    });
+    fecharModalAddFoto();
+  } catch (err) {
+    console.error('Erro ao postar foto:', err);
+    status.style.color = '#ff7a33';
+    status.textContent = '❌ ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Carregar galeria
+function carregarFotos() {
+  const q = query(collection(db, 'fotos'), orderBy('criadoEm', 'desc'));
+  const unsub = onSnapshot(q, (snapshot) => {
+    const galeria = document.getElementById('galeria-fotos');
+    if (!galeria) return;
+
+    if (snapshot.empty) {
+      galeria.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora postar a primeira! 📸</p>';
+      return;
+    }
+
+    galeria.innerHTML = '';
+    snapshot.forEach((docSnap) => {
+      const f = docSnap.data();
+      const id = docSnap.id;
+      const data = f.criadoEm?.toDate?.() || new Date();
+      const dataFmt = data.toLocaleDateString('pt-BR');
+      const podeExcluir = isAdmin || (currentUser && f.uid === currentUser.uid);
+
+      const card = document.createElement('div');
+      card.className = 'foto-card';
+      card.innerHTML = `
+        <img src="${f.fotoUrl}" class="foto-thumb" alt="foto" loading="lazy" />
+        <div class="foto-legenda-box">
+          <span class="foto-titulo">${escapeHtml(f.legenda || 'Sem legenda')}</span>
+          <span class="foto-data">📅 ${dataFmt}</span>
+        </div>
+        ${podeExcluir ? `<button class="btn-excluir-foto" data-id="${id}">🗑️</button>` : ''}
+      `;
+
+      card.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-excluir-foto')) return;
+        abrirModalVerFoto(id, f, dataFmt);
+      });
+
+      const btnDel = card.querySelector('.btn-excluir-foto');
+      if (btnDel) {
+        btnDel.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm('Excluir essa foto e todos os comentários dela?')) return;
+          try {
+            const comSnap = await getDocs(collection(db, 'fotos', id, 'comentarios'));
+            for (const com of comSnap.docs) {
+              await deleteDoc(doc(db, 'fotos', id, 'comentarios', com.id));
+            }
+            await deleteDoc(doc(db, 'fotos', id));
+          } catch (err) {
+            console.error('Erro ao excluir foto:', err);
+            alert('Erro ao excluir.');
+          }
+        });
+      }
+
+      galeria.appendChild(card);
+    });
+  });
+  unsubscribes.push(unsub);
+}
+
+// Abrir modal de visualização + comentários
+let unsubComentariosFoto = null;
+function abrirModalVerFoto(id, foto, dataFmt) {
+  document.getElementById('ver-foto-img').src = foto.fotoUrl;
+  document.getElementById('ver-foto-legenda').textContent = foto.legenda || 'Sem legenda';
+  document.getElementById('ver-foto-data').textContent = `📅 ${dataFmt} — por ${foto.autor || 'Anônimo'}`;
+  modalVerFoto.classList.remove('hidden');
+
+  const btnComentar = document.getElementById('btn-comentar-foto');
+  btnComentar.onclick = async () => {
+    const textarea = document.getElementById('ver-foto-comentario');
+    const texto = textarea.value.trim();
+    if (!texto) { alert('Escreve algo aí, brother! 😅'); return; }
+    try {
+      await addDoc(collection(db, 'fotos', id, 'comentarios'), {
+        texto,
+        autor: nomeAtual(),
+        uid: currentUser.uid,
+        criadoEm: serverTimestamp()
+      });
+      textarea.value = '';
+    } catch (err) {
+      console.error('Erro ao comentar:', err);
+      alert('Erro ao comentar. Tenta de novo!');
+    }
+  };
+
+  if (unsubComentariosFoto) unsubComentariosFoto();
+  const q = query(collection(db, 'fotos', id, 'comentarios'), orderBy('criadoEm', 'asc'));
+  unsubComentariosFoto = onSnapshot(q, (snapshot) => {
+    const container = document.getElementById('ver-foto-comentarios');
+    if (!container) return;
+    container.innerHTML = '';
+    if (snapshot.empty) {
+      container.innerHTML = '<p class="hint" style="padding:10px;">Nenhum comentário ainda.</p>';
+      return;
+    }
+    snapshot.forEach((docSnap) => {
+      const c = docSnap.data();
+      const cid = docSnap.id;
+      const d = c.criadoEm?.toDate?.() || new Date();
+      const dFmt = d.toLocaleString('pt-BR');
+      const podeExcluir = isAdmin || (currentUser && c.uid === currentUser.uid);
+
+      const div = document.createElement('div');
+      div.className = 'comentario-item';
+      div.innerHTML = `
+        <span class="autor-comentario">${escapeHtml(c.autor || 'Anônimo')}</span>
+        <span class="data-comentario">${dFmt}</span>
+        <div class="texto-comentario">${escapeHtml(c.texto)}</div>
+        ${podeExcluir ? `<button class="btn-excluir-mini" data-com="${cid}">✕</button>` : ''}
+      `;
+      const btnDel = div.querySelector('.btn-excluir-mini');
+      if (btnDel) {
+        btnDel.addEventListener('click', async () => {
+          if (!confirm('Excluir esse comentário?')) return;
+          try {
+            await deleteDoc(doc(db, 'fotos', id, 'comentarios', cid));
+          } catch (err) { console.error(err); }
+        });
+      }
+      container.appendChild(div);
+    });
+  });
+}
+
+function fecharModalVerFoto() {
+  modalVerFoto.classList.add('hidden');
+  if (unsubComentariosFoto) { unsubComentariosFoto(); unsubComentariosFoto = null; }
+  document.getElementById('ver-foto-comentario').value = '';
+}
+document.getElementById('fechar-ver-foto').addEventListener('click', fecharModalVerFoto);
+modalVerFoto.addEventListener('click', (e) => {
+  if (e.target === modalVerFoto) fecharModalVerFoto();
+});
 
 // Função auxiliar pra escapar HTML (segurança)
 function escapeHtml(text) {
