@@ -2,7 +2,7 @@
 import {
   getFirestore, collection, addDoc, doc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp,
-  getDocs, where, writeBatch, arrayRemove
+  getDocs, getDoc, setDoc, where, writeBatch, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
@@ -29,7 +29,6 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // ===== CONFIG ADMIN =====
-// ⚠️ SUBSTITUA pelo SEU UID copiado do Firebase Auth!
 const ADMIN_UID = "DJtE0gEcDRd4JFARFxAobJshd8j1";
 
 // ===== CONFIG IMGBB =====
@@ -40,6 +39,7 @@ const IMGBB_URL = "https://api.imgbb.com/1/upload";
 let currentUser = null;
 let isAdmin = false;
 let membros = [];
+let duplas = [];
 let churrascos = [];
 let ofensas = [];
 let unsubscribes = [];
@@ -70,14 +70,13 @@ formLogin.addEventListener('submit', async (e) => {
   }
 });
 
-// ===== LOGOUT (listener único) =====
+// ===== LOGOUT =====
 document.getElementById('btn-logout').addEventListener('click', async () => {
   if (!confirm('Sair da conta?')) return;
   await signOut(auth);
 });
 
 onAuthStateChanged(auth, (user) => {
-  // Desliga listeners antigos
   unsubscribes.forEach(u => u && u());
   unsubscribes = [];
 
@@ -88,16 +87,13 @@ onAuthStateChanged(auth, (user) => {
     telaLogin.classList.add('hidden');
     appContainer.classList.remove('hidden');
 
-    // Mostra nome do usuário (parte antes do @)
     const nomeExibido = user.displayName || user.email.split('@')[0];
     document.getElementById('user-nome').textContent = `👤 ${nomeExibido}`;
 
-    // Badge admin
     const badge = document.getElementById('user-badge');
     if (isAdmin) badge.classList.remove('hidden');
     else badge.classList.add('hidden');
 
-    // Mostra abas admin-only só pra admin
     document.querySelectorAll('.admin-only').forEach(el => {
       if (isAdmin) el.classList.remove('hidden');
       else el.classList.add('hidden');
@@ -123,13 +119,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ===== HELPER: nome do usuário atual =====
+// ===== HELPERS =====
 function nomeAtual() {
   if (!currentUser) return 'Anônimo';
   return currentUser.displayName || currentUser.email.split('@')[0];
 }
 
-// ===== HELPER: upload de imagem para ImgBB (reutilizável) =====
 async function uploadImagemImgBB(arquivo) {
   const formData = new FormData();
   formData.append('image', arquivo);
@@ -149,9 +144,19 @@ function iniciarListeners() {
   unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
     membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderMembrosAdmin();
+    renderSelectMembrosDupla();
     renderSelectResponsavel();
     renderSelectPresenca();
     renderRankings();
+    renderHome();
+  }));
+
+  unsubscribes.push(onSnapshot(collection(db, 'duplas'), (snap) => {
+    duplas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderDuplasAdmin();
+    renderSelectResponsavel();
+    renderRankings();
+    renderHome();
   }));
 
   unsubscribes.push(onSnapshot(query(collection(db, 'churrascos'), orderBy('data', 'asc')), (snap) => {
@@ -163,11 +168,17 @@ function iniciarListeners() {
     renderHome();
   }));
 
+  // Financeiro: doc fixo config/financeiro
+  unsubscribes.push(onSnapshot(doc(db, 'config', 'financeiro'), (snap) => {
+    const dados = snap.exists() ? snap.data() : null;
+    renderFinanceiroHome(dados);
+    renderFinanceiroAdmin(dados);
+  }));
+
   carregarOfensas();
 }
 
 // ===== CADASTRAR USUÁRIO (CONTA + MEMBRO) — SÓ ADMIN =====
-// Listener único: usa instância secundária pra NÃO deslogar o admin.
 document.getElementById('form-usuario').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!isAdmin) { alert('🚫 Só o admin pode cadastrar usuários!'); return; }
@@ -181,7 +192,6 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
   status.style.color = '#ff7a33';
   status.textContent = '⏳ Criando conta...';
 
-  // Segunda instância: cria a conta SEM trocar a sessão do admin
   const secApp  = initializeApp(firebaseConfig, 'secundario-' + Date.now());
   const secAuth = getAuth(secApp);
 
@@ -189,7 +199,6 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
     const cred = await createUserWithEmailAndPassword(secAuth, email, senha);
     const novoUid = cred.user.uid;
 
-    // Cria o membro vinculado ao uid da conta nova (usa o db da sessão do admin)
     await addDoc(collection(db, 'membros'), {
       nome,
       uid: novoUid,
@@ -211,14 +220,91 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
     status.style.color = '#ff7a33';
     status.textContent = '❌ ' + (msgs[err.code] || err.message);
   } finally {
-    // Desliga a sessão secundária e descarta o app, sem afetar o admin
     await signOut(secAuth).catch(() => {});
     await deleteApp(secApp).catch(() => {});
   }
 });
 
+// ===== CADASTRAR DUPLA — SÓ ADMIN =====
+function renderSelectMembrosDupla() {
+  const s1 = document.getElementById('dupla-membro1');
+  const s2 = document.getElementById('dupla-membro2');
+  if (!s1 || !s2) return;
+  const opcoes = membros.map(m => `<option value="${m.id}">${escapeHtml(m.nome)}</option>`).join('');
+  s1.innerHTML = '<option value="">Membro 1...</option>' + opcoes;
+  s2.innerHTML = '<option value="">Membro 2...</option>' + opcoes;
+}
 
-// ===== LISTA DE MEMBROS COM EXCLUSÃO DE DADOS (SÓ ADMIN) =====
+document.getElementById('form-dupla').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar duplas!'); return; }
+
+  const id1 = document.getElementById('dupla-membro1').value;
+  const id2 = document.getElementById('dupla-membro2').value;
+  const status = document.getElementById('dupla-status');
+
+  if (!id1 || !id2) { status.textContent = '❌ Escolha os dois membros.'; return; }
+  if (id1 === id2) { status.textContent = '❌ A dupla precisa de dois membros diferentes.'; return; }
+
+  const m1 = membros.find(m => m.id === id1);
+  const m2 = membros.find(m => m.id === id2);
+  const nomeDupla = `${m1.nome} & ${m2.nome}`;
+
+  // Evita dupla repetida (mesma combinação, em qualquer ordem)
+  const jaExiste = duplas.some(d =>
+    (d.membro1Id === id1 && d.membro2Id === id2) ||
+    (d.membro1Id === id2 && d.membro2Id === id1)
+  );
+  if (jaExiste) { status.textContent = '❌ Essa dupla já existe.'; return; }
+
+  try {
+    await addDoc(collection(db, 'duplas'), {
+      nome: nomeDupla,
+      membro1Id: id1, membro1Nome: m1.nome,
+      membro2Id: id2, membro2Nome: m2.nome,
+      criadoPor: currentUser.uid,
+      criadoEm: serverTimestamp()
+    });
+    status.style.color = '#7aff7a';
+    status.textContent = '✅ Dupla criada!';
+    e.target.reset();
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#ff7a33';
+    status.textContent = '❌ ' + err.message;
+  }
+});
+
+function renderDuplasAdmin() {
+  const lista = document.getElementById('lista-duplas-admin');
+  if (!lista) return;
+  if (!isAdmin) { lista.innerHTML = ''; return; }
+  if (!duplas.length) {
+    lista.innerHTML = '<p class="hint">Nenhuma dupla cadastrada.</p>';
+    return;
+  }
+  lista.innerHTML = duplas.map(d => `
+    <div class="evento-item" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>👥 <strong>${escapeHtml(d.nome)}</strong></span>
+      <button class="btn-excluir" onclick="excluirDupla('${d.id}')">🗑️ Excluir</button>
+    </div>
+  `).join('');
+}
+
+window.excluirDupla = async (duplaId) => {
+  if (!isAdmin) return alert('🚫 Só admin.');
+  const d = duplas.find(x => x.id === duplaId);
+  if (!d) return;
+  if (!confirm(`Excluir a dupla "${d.nome}"?\n\nOs churrascos já realizados por ela continuam no histórico e no ranking.`)) return;
+  try {
+    await deleteDoc(doc(db, 'duplas', duplaId));
+  } catch (err) {
+    console.error(err);
+    alert('Erro: ' + err.message);
+  }
+};
+
+// ===== LISTA DE MEMBROS COM EXCLUSÃO (SÓ ADMIN) =====
 function renderMembrosAdmin() {
   const lista = document.getElementById('lista-membros-admin');
   if (!lista) return;
@@ -235,15 +321,14 @@ function renderMembrosAdmin() {
   `).join('');
 }
 
-// Apaga o membro e tudo ligado a ele
 window.excluirDadosMembro = async (membroId) => {
   if (!isAdmin) return alert('🚫 Só admin.');
   const m = membros.find(x => x.id === membroId);
   if (!m) return;
 
   const aviso = m.uid
-    ? `Excluir "${m.nome}" e TODOS os dados dele (ofensas, comentários, presença)?\n\n⚠️ O LOGIN continua no console do Firebase. Remova manualmente lá.`
-    : `Excluir "${m.nome}" e os dados de presença dele?`;
+    ? `Excluir "${m.nome}" e TODOS os dados dele (ofensas, comentários, presença)?\n\n⚠️ O LOGIN continua no console do Firebase. Remova manualmente lá.\n\nAs duplas que incluem esse membro também serão apagadas.`
+    : `Excluir "${m.nome}" e os dados de presença dele?\n\nAs duplas que incluem esse membro também serão apagadas.`;
   if (!confirm(aviso)) return;
 
   try {
@@ -258,13 +343,18 @@ window.excluirDadosMembro = async (membroId) => {
     });
     await batch.commit();
 
-    // 2) Se tiver uid, apaga ofensas e comentários do usuário
+    // 2) Apaga duplas que contenham esse membro
+    const duplasDoMembro = duplas.filter(d => d.membro1Id === membroId || d.membro2Id === membroId);
+    for (const d of duplasDoMembro) {
+      await deleteDoc(doc(db, 'duplas', d.id));
+    }
+
+    // 3) Se tiver uid, apaga ofensas e comentários do usuário
     if (m.uid) {
       const ofensasSnap = await getDocs(
         query(collection(db, 'ofensas'), where('uid', '==', m.uid))
       );
       for (const ofDoc of ofensasSnap.docs) {
-        // apaga comentários da ofensa antes da ofensa
         const comSnap = await getDocs(collection(db, 'ofensas', ofDoc.id, 'comentarios'));
         for (const com of comSnap.docs) {
           await deleteDoc(doc(db, 'ofensas', ofDoc.id, 'comentarios', com.id));
@@ -273,7 +363,7 @@ window.excluirDadosMembro = async (membroId) => {
       }
     }
 
-    // 3) Apaga o documento do membro
+    // 4) Apaga o documento do membro
     await deleteDoc(doc(db, 'membros', membroId));
 
     alert('✅ Dados do membro excluídos. Lembra de remover o login no console do Firebase.');
@@ -283,25 +373,43 @@ window.excluirDadosMembro = async (membroId) => {
   }
 };
 
+// ===== SELECT DE RESPONSÁVEL (DUPLAS + MEMBROS AVULSOS) =====
 function renderSelectResponsavel() {
   const sel = document.getElementById('churrasco-responsavel');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Churrasqueiro responsável...</option>' +
-    membros.map(m => `<option value="${m.id}">${escapeHtml(m.nome)}</option>`).join('');
+  const optDuplas = duplas.length
+    ? `<optgroup label="👥 Duplas">${duplas.map(d => `<option value="dupla:${d.id}">${escapeHtml(d.nome)}</option>`).join('')}</optgroup>`
+    : '';
+  const optMembros = membros.length
+    ? `<optgroup label="👤 Avulsos">${membros.map(m => `<option value="membro:${m.id}">${escapeHtml(m.nome)}</option>`).join('')}</optgroup>`
+    : '';
+  sel.innerHTML = '<option value="">Churrasqueiro responsável...</option>' + optDuplas + optMembros;
 }
 
 // ===== AGENDA =====
 document.getElementById('form-agenda').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = document.getElementById('churrasco-data').value;
-  const responsavelId = document.getElementById('churrasco-responsavel').value;
+  const valorResp = document.getElementById('churrasco-responsavel').value; // "dupla:id" ou "membro:id"
   const obs = document.getElementById('churrasco-obs').value.trim();
-  const responsavel = membros.find(m => m.id === responsavelId);
+
+  if (!valorResp) { alert('Escolha o churrasqueiro responsável.'); return; }
+
+  const [tipo, idResp] = valorResp.split(':');
+  let nomeResp = 'Desconhecido';
+  if (tipo === 'dupla') {
+    const d = duplas.find(x => x.id === idResp);
+    nomeResp = d ? d.nome : 'Dupla removida';
+  } else {
+    const m = membros.find(x => x.id === idResp);
+    nomeResp = m ? m.nome : 'Membro removido';
+  }
 
   await addDoc(collection(db, 'churrascos'), {
     data,
-    responsavelId,
-    responsavelNome: responsavel ? responsavel.nome : 'Desconhecido',
+    responsavelTipo: tipo,            // "dupla" ou "membro"
+    responsavelId: idResp,
+    responsavelNome: nomeResp,
     obs,
     realizado: false,
     presentes: [],
@@ -369,7 +477,7 @@ window.excluirChurrasco = async (id) => {
   await deleteDoc(doc(db, 'churrascos', id));
 };
 
-// ===== PRESENÇA =====
+// ===== PRESENÇA (POR MEMBRO) =====
 function renderSelectPresenca() {
   const sel = document.getElementById('select-churrasco-presenca');
   if (!sel) return;
@@ -408,23 +516,28 @@ document.getElementById('btn-salvar-presenca').addEventListener('click', async (
 });
 
 // ===== RANKINGS =====
+// Churrasqueiro: agrupa por chave composta tipo:id (dupla ou membro)
 function renderRankings() {
   const realizados = churrascos.filter(c => c.realizado);
   const totalRealizados = realizados.length;
 
-  const contagemChurras = {};
+  const contagemChurras = {}; // chave "tipo:id" -> { nome, total }
   realizados.forEach(c => {
-    contagemChurras[c.responsavelId] = (contagemChurras[c.responsavelId] || 0) + 1;
+    const tipo = c.responsavelTipo || 'membro';
+    const chave = `${tipo}:${c.responsavelId}`;
+    if (!contagemChurras[chave]) {
+      contagemChurras[chave] = { nome: c.responsavelNome || '?', total: 0 };
+    }
+    contagemChurras[chave].total += 1;
   });
-  const rankingChurras = membros.map(m => ({
-    nome: m.nome, total: contagemChurras[m.id] || 0
-  })).sort((a,b) => b.total - a.total);
+  const rankingChurras = Object.values(contagemChurras).sort((a, b) => b.total - a.total);
 
   const listaRank = document.getElementById('lista-ranking');
   if (listaRank) listaRank.innerHTML = rankingChurras.length
     ? rankingChurras.map(r => `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.total} 🔥</span></li>`).join('')
     : '<p class="hint">Sem dados ainda.</p>';
 
+  // Sumidos: por MEMBRO individual
   const contagemFaltas = {};
   realizados.forEach(c => {
     const presentes = c.presentes || [];
@@ -434,7 +547,7 @@ function renderRankings() {
   });
   const rankingSumido = membros.map(m => ({
     nome: m.nome, faltas: contagemFaltas[m.id] || 0, total: totalRealizados
-  })).sort((a,b) => b.faltas - a.faltas);
+  })).sort((a, b) => b.faltas - a.faltas);
 
   const listaSumido = document.getElementById('lista-sumido');
   if (listaSumido) listaSumido.innerHTML = rankingSumido.length && totalRealizados
@@ -460,24 +573,94 @@ function renderHome() {
   const elTotal = document.getElementById('total-churrascos');
   if (elTotal) elTotal.textContent = realizados.length;
 
+  // Mestre por chave composta
   const contagem = {};
-  realizados.forEach(c => { contagem[c.responsavelId] = (contagem[c.responsavelId] || 0) + 1; });
-  let mestre = null, max = 0;
-  for (const id in contagem) if (contagem[id] > max) { max = contagem[id]; mestre = id; }
-  const mestreObj = membros.find(m => m.id === mestre);
+  realizados.forEach(c => {
+    const tipo = c.responsavelTipo || 'membro';
+    const chave = `${tipo}:${c.responsavelId}`;
+    if (!contagem[chave]) contagem[chave] = { nome: c.responsavelNome || '?', total: 0 };
+    contagem[chave].total += 1;
+  });
+  let mestreNome = null, max = 0;
+  for (const chave in contagem) {
+    if (contagem[chave].total > max) { max = contagem[chave].total; mestreNome = contagem[chave].nome; }
+  }
   const elMestre = document.getElementById('mestre-churrasco');
-  if (elMestre) elMestre.textContent = mestreObj ? `🥇 ${mestreObj.nome} (${max})` : '—';
+  if (elMestre) elMestre.textContent = mestreNome ? `🥇 ${mestreNome} (${max})` : '—';
 
+  // Sumido por membro
   const faltas = {};
   realizados.forEach(c => {
     const p = c.presentes || [];
-    membros.forEach(m => { if (!p.includes(m.id)) faltas[m.id] = (faltas[m.id]||0)+1; });
+    membros.forEach(m => { if (!p.includes(m.id)) faltas[m.id] = (faltas[m.id] || 0) + 1; });
   });
   let sumido = null, maxF = 0;
   for (const id in faltas) if (faltas[id] > maxF) { maxF = faltas[id]; sumido = id; }
   const sumidoObj = membros.find(m => m.id === sumido);
   const elSum = document.getElementById('sumido-vez');
   if (elSum) elSum.textContent = sumidoObj && maxF > 0 ? `👻 ${sumidoObj.nome} (${maxF})` : '—';
+}
+
+// ===== FINANCEIRO =====
+document.getElementById('form-financeiro').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!isAdmin) { alert('🚫 Só o admin pode atualizar o saldo!'); return; }
+  const saldo = parseFloat(document.getElementById('financeiro-saldo').value);
+  const status = document.getElementById('financeiro-status');
+  if (isNaN(saldo)) { status.style.color = '#ff7a33'; status.textContent = '❌ Informe um valor válido.'; return; }
+
+  try {
+    await setDoc(doc(db, 'config', 'financeiro'), {
+      saldo,
+      atualizadoEm: serverTimestamp(),
+      atualizadoPor: nomeAtual()
+    });
+    status.style.color = '#7aff7a';
+    status.textContent = '✅ Saldo atualizado!';
+    e.target.reset();
+  } catch (err) {
+    console.error(err);
+    status.style.color = '#ff7a33';
+    status.textContent = '❌ ' + err.message;
+  }
+});
+
+function formatarReal(v) {
+  return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function renderFinanceiroHome(dados) {
+  const elSaldo = document.getElementById('caixinha-saldo');
+  const elData = document.getElementById('caixinha-data');
+  if (!elSaldo) return;
+  if (!dados || dados.saldo == null) {
+    elSaldo.textContent = '—';
+    if (elData) elData.textContent = '';
+    return;
+  }
+  elSaldo.textContent = formatarReal(dados.saldo);
+  if (elData) {
+    const d = dados.atualizadoEm?.toDate?.();
+    elData.textContent = d ? `Atualizado em ${d.toLocaleDateString('pt-BR')}` : '';
+  }
+}
+
+function renderFinanceiroAdmin(dados) {
+  const div = document.getElementById('financeiro-atual');
+  if (!div) return;
+  if (!isAdmin) { div.innerHTML = ''; return; }
+  if (!dados || dados.saldo == null) {
+    div.innerHTML = '<p class="hint">Nenhum saldo registrado ainda.</p>';
+    return;
+  }
+  const d = dados.atualizadoEm?.toDate?.();
+  div.innerHTML = `
+    <div class="evento-item" style="margin:0;">
+      <div class="info">💰 Saldo atual: <strong>${formatarReal(dados.saldo)}</strong></div>
+      ${d ? `<div class="info">📅 Atualizado em ${d.toLocaleString('pt-BR')}</div>` : ''}
+      ${dados.atualizadoPor ? `<div class="info" style="font-size:0.8rem;opacity:0.7;">— por ${escapeHtml(dados.atualizadoPor)}</div>` : ''}
+    </div>
+  `;
 }
 
 // ===== POSTAR OFENSA (COM FOTO OPCIONAL) =====
@@ -492,7 +675,6 @@ document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
   const arquivo = inputFoto?.files?.[0] || null;
   let fotoUrl = null;
 
-  // Trava o botão pra não duplicar envio
   if (btnPostar) btnPostar.disabled = true;
 
   try {
@@ -508,7 +690,7 @@ document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
 
     await addDoc(collection(db, 'ofensas'), {
       texto,
-      fotoUrl, // null quando não há imagem
+      fotoUrl,
       autor: nomeAtual(),
       uid: currentUser.uid,
       criadoEm: serverTimestamp()
@@ -549,7 +731,6 @@ function carregarOfensas() {
 
       const podeExcluir = isAdmin || (currentUser && ofensa.uid === currentUser.uid);
 
-      // Renderiza a imagem só quando existir
       const imagemHtml = ofensa.fotoUrl
         ? `<img src="${ofensa.fotoUrl}" class="ofensa-img" alt="imagem da ofensa" loading="lazy" onclick="window.open('${ofensa.fotoUrl}','_blank')" />`
         : '';
@@ -577,14 +758,9 @@ function carregarOfensas() {
       `;
 
       lista.appendChild(div);
-
-      // Carrega os comentários dessa ofensa
       carregarComentarios(ofensaId);
     });
 
-    // ===== Listeners dos botões =====
-
-    // Botão "Responder" (toggle do form)
     document.querySelectorAll('.btn-comentar').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = e.target.dataset.id;
@@ -592,7 +768,6 @@ function carregarOfensas() {
       });
     });
 
-    // Botão "Postar Resposta"
     document.querySelectorAll('.form-comentario .btn-mini').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const ofensaId = e.target.dataset.id;
@@ -620,7 +795,6 @@ function carregarOfensas() {
       });
     });
 
-    // Botão "Excluir Ofensa"
     document.querySelectorAll('.btn-excluir[data-tipo="ofensa"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         if (!confirm('Excluir essa ofensa e todos os comentários?')) return;
@@ -677,7 +851,6 @@ function carregarComentarios(ofensaId) {
       container.appendChild(div);
     });
 
-    // Listener dos botões de excluir comentário
     container.querySelectorAll('.btn-excluir-mini').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         if (!confirm('Excluir esse comentário?')) return;
