@@ -175,7 +175,7 @@ function iniciarListeners() {
     renderFinanceiroAdmin(dados);
   }));
 
-  carregarOfensas();  carregarFotos();
+  carregarFotos();
 
 }
 
