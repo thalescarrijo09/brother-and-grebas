@@ -664,49 +664,6 @@ function renderFinanceiroAdmin(dados) {
   `;
 }
 
-// ===== POSTAR OFENSA (COM FOTO OPCIONAL) =====
-document.getElementById('form-ofensa').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const texto = document.getElementById('ofensa-texto').value.trim();
-  if (!texto) return;
-
-  const inputFoto = document.getElementById('ofensa-foto');
-  const statusFoto = document.getElementById('ofensa-foto-status');
-  const btnPostar = document.getElementById('btn-postar-ofensa');
-  const arquivo = inputFoto?.files?.[0] || null;
-  let fotoUrl = null;
-
-  if (btnPostar) btnPostar.disabled = true;
-
-  try {
-    if (arquivo) {
-      if (arquivo.size > 32 * 1024 * 1024) {
-        alert('❌ Imagem muito grande. Máximo 32MB.');
-        if (btnPostar) btnPostar.disabled = false;
-        return;
-      }
-      if (statusFoto) statusFoto.textContent = '📤 Enviando imagem...';
-      fotoUrl = await uploadImagemImgBB(arquivo);
-    }
-
-    await addDoc(collection(db, 'ofensas'), {
-      texto,
-      fotoUrl,
-      autor: nomeAtual(),
-      uid: currentUser.uid,
-      criadoEm: serverTimestamp()
-    });
-
-    e.target.reset();
-    if (statusFoto) statusFoto.textContent = '';
-  } catch (err) {
-    console.error('Erro ao postar ofensa:', err);
-    alert('Erro ao postar ofensa: ' + err.message);
-    if (statusFoto) statusFoto.textContent = '';
-  } finally {
-    if (btnPostar) btnPostar.disabled = false;
-  }
-});
 
 // ============================================
 // OFENSAS COM COMENTÁRIOS
