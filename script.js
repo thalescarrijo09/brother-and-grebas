@@ -97,17 +97,11 @@ onAuthStateChanged(auth, (user) => {
     if (isAdmin) badge.classList.remove('hidden');
     else badge.classList.add('hidden');
 
-    // Esconde aba de membros pra não-admin
+    // Mostra abas admin-only só pra admin
     document.querySelectorAll('.admin-only').forEach(el => {
       if (isAdmin) el.classList.remove('hidden');
       else el.classList.add('hidden');
     });
-
-    // Esconde formulário de cadastrar membro pra não-admin
-    const formMembro = document.getElementById('form-membro');
-    if (formMembro) {
-      formMembro.style.display = isAdmin ? '' : 'none';
-    }
 
     iniciarListeners();
     formLogin.reset();
@@ -154,7 +148,6 @@ async function uploadImagemImgBB(arquivo) {
 function iniciarListeners() {
   unsubscribes.push(onSnapshot(collection(db, 'membros'), (snap) => {
     membros = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderMembros();
     renderMembrosAdmin();
     renderSelectResponsavel();
     renderSelectPresenca();
@@ -172,20 +165,6 @@ function iniciarListeners() {
 
   carregarOfensas();
 }
-
-// ===== MEMBROS (SÓ ADMIN) =====
-document.getElementById('form-membro').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (!isAdmin) { alert('🚫 Só o admin pode cadastrar membros!'); return; }
-  const nome = document.getElementById('membro-nome').value.trim();
-  if (!nome) return;
-  await addDoc(collection(db, 'membros'), {
-    nome,
-    criadoPor: currentUser.uid,
-    criadoEm: serverTimestamp()
-  });
-  document.getElementById('membro-nome').value = '';
-});
 
 // ===== CADASTRAR USUÁRIO (CONTA + MEMBRO) — SÓ ADMIN =====
 // Listener único: usa instância secundária pra NÃO deslogar o admin.
@@ -238,20 +217,6 @@ document.getElementById('form-usuario').addEventListener('submit', async (e) => 
   }
 });
 
-
-function renderMembros() {
-  const lista = document.getElementById('lista-membros');
-  if (!membros.length) {
-    lista.innerHTML = '<p class="hint">Nenhum membro cadastrado ainda.</p>';
-    return;
-  }
-  lista.innerHTML = membros.map(m => `
-    <span class="membro-item">
-      👤 ${escapeHtml(m.nome)}
-      ${isAdmin ? `<button onclick="removerMembro('${m.id}')" title="Remover">✖</button>` : ''}
-    </span>
-  `).join('');
-}
 
 // ===== LISTA DE MEMBROS COM EXCLUSÃO DE DADOS (SÓ ADMIN) =====
 function renderMembrosAdmin() {
@@ -316,12 +281,6 @@ window.excluirDadosMembro = async (membroId) => {
     console.error('Erro ao excluir dados do membro:', err);
     alert('Erro: ' + err.message);
   }
-};
-
-window.removerMembro = async (id) => {
-  if (!isAdmin) return alert('🚫 Só admin remove membros');
-  if (!confirm('Remover este membro?')) return;
-  await deleteDoc(doc(db, 'membros', id));
 };
 
 function renderSelectResponsavel() {
