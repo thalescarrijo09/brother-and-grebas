@@ -47,7 +47,6 @@
         <button class="tab-btn" data-tab="agenda">📅 Agenda</button>
         <button class="tab-btn" data-tab="presenca">✅ Presença</button>
         <button class="tab-btn" data-tab="ofensas">🤬 Mural de Ofensas</button>
-        <button class="tab-btn admin-only hidden" data-tab="membros">👥 Membros</button>
         <button class="tab-btn admin-only hidden" data-tab="usuarios">🔐 Usuários</button>
       </nav>
     </header>
@@ -177,53 +176,32 @@
         </div>
       </section>
 
-      <!-- ========== ABA MEMBROS (SÓ ADMIN) ========== -->
-      <section id="membros" class="tab-content">
+      <!-- ========== ABA USUÁRIOS (SÓ ADMIN) ========== -->
+      <section id="usuarios" class="tab-content">
         <div class="card">
-          <h2>👥 Cadastrar Membro</h2>
+          <h2>🔐 Cadastrar Usuário (login)</h2>
           <p class="hint" style="text-align:left; padding: 0 0 15px;">
-            ⚠️ Só o admin pode cadastrar novos membros do grupo.
+            ⚠️ Cria a conta de login E o membro de uma vez. A senha pode ser trocada pela pessoa depois.
           </p>
-          <form id="form-membro">
-            <input type="text" id="membro-nome" placeholder="👤 Nome do brother ou greba" required />
-            <button type="submit">➕ Adicionar</button>
+          <form id="form-usuario">
+            <input type="text"     id="usuario-nome"  placeholder="👤 Nome do brother ou greba" required />
+            <input type="email"    id="usuario-email" placeholder="📧 Email de login" required />
+            <input type="password" id="usuario-senha" placeholder="🔒 Senha (mín. 6 caracteres)" required minlength="6" />
+            <button type="submit">➕ Criar Conta + Membro</button>
+            <p id="usuario-status" class="login-erro" style="color:#ff7a33;"></p>
           </form>
         </div>
 
         <div class="card">
-          <h2>👨‍👩‍👧‍👦 Membros do Grupo</h2>
-          <div id="lista-membros">
+          <h2>🗑️ Excluir Dados de Membro</h2>
+          <p class="hint" style="text-align:left; padding: 0 0 15px;">
+            Apaga o membro e tudo ligado a ele (ofensas, comentários, presença). O login continua no console do Firebase até você remover na mão.
+          </p>
+          <div id="lista-membros-admin">
             <p class="hint">Carregando...</p>
           </div>
         </div>
       </section>
-
-      <!-- ========== ABA USUÁRIOS (SÓ ADMIN) ========== -->
-<section id="usuarios" class="tab-content">
-  <div class="card">
-    <h2>🔐 Cadastrar Usuário (login)</h2>
-    <p class="hint" style="text-align:left; padding: 0 0 15px;">
-      ⚠️ Cria a conta de login E o membro de uma vez. A senha pode ser trocada pela pessoa depois.
-    </p>
-    <form id="form-usuario">
-      <input type="text"     id="usuario-nome"  placeholder="👤 Nome do brother ou greba" required />
-      <input type="email"    id="usuario-email" placeholder="📧 Email de login" required />
-      <input type="password" id="usuario-senha" placeholder="🔒 Senha (mín. 6 caracteres)" required minlength="6" />
-      <button type="submit">➕ Criar Conta + Membro</button>
-      <p id="usuario-status" class="login-erro" style="color:#ff7a33;"></p>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>🗑️ Excluir Dados de Membro</h2>
-    <p class="hint" style="text-align:left; padding: 0 0 15px;">
-      Apaga o membro e tudo ligado a ele (ofensas, comentários, presença). O login continua no console do Firebase até você remover na mão.
-    </p>
-    <div id="lista-membros-admin">
-      <p class="hint">Carregando...</p>
-    </div>
-  </div>
-</section>
 
     </main>
 
