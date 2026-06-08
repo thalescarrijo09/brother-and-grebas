@@ -422,15 +422,17 @@ document.getElementById('form-agenda').addEventListener('submit', async (e) => {
   alert('🔥 Churrasco agendado!');
 });
 
+// ===== AGENDA (paginado) =====
 function renderAgenda() {
   const hoje = new Date().toISOString().split('T')[0];
   const proximos = churrascos.filter(c => !c.realizado && c.data >= hoje);
   const lista = document.getElementById('lista-agenda');
   if (!proximos.length) {
     lista.innerHTML = '<p class="hint">Nenhum churrasco agendado. Bora marcar um!</p>';
+    paginar('lista-agenda', [], () => '');
     return;
   }
-  lista.innerHTML = proximos.map(c => {
+  paginar('lista-agenda', proximos, c => {
     const podeExcluir = isAdmin || c.criadoPor === currentUser.uid;
     return `
       <div class="evento-item">
@@ -441,17 +443,20 @@ function renderAgenda() {
         ${podeExcluir ? `<button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>` : ''}
       </div>
     `;
-  }).join('');
+  });
 }
 
+
+// ===== HISTÓRICO (paginado) =====
 function renderHistorico() {
   const realizados = churrascos.filter(c => c.realizado).reverse();
   const lista = document.getElementById('lista-historico');
   if (!realizados.length) {
     lista.innerHTML = '<p class="hint">Nenhum churrasco realizado ainda.</p>';
+    paginar('lista-historico', [], () => '');
     return;
   }
-  lista.innerHTML = realizados.map(c => {
+  paginar('lista-historico', realizados, c => {
     const presentesNomes = (c.presentes || []).map(id => {
       const m = membros.find(x => x.id === id);
       return m ? m.nome : '?';
@@ -465,7 +470,7 @@ function renderHistorico() {
         ${podeExcluir ? `<button class="btn-excluir" onclick="excluirChurrasco('${c.id}')">🗑️ Excluir</button>` : ''}
       </div>
     `;
-  }).join('');
+  });
 }
 
 window.excluirChurrasco = async (id) => {
@@ -516,29 +521,32 @@ document.getElementById('btn-salvar-presenca').addEventListener('click', async (
   document.getElementById('btn-salvar-presenca').classList.add('hidden');
 });
 
-// ===== RANKINGS =====
-// Churrasqueiro: agrupa por chave composta tipo:id (dupla ou membro)
+// ===== RANKINGS (paginado) =====
 function renderRankings() {
   const realizados = churrascos.filter(c => c.realizado);
   const totalRealizados = realizados.length;
 
-  const contagemChurras = {}; // chave "tipo:id" -> { nome, total }
+  const contagemChurras = {};
   realizados.forEach(c => {
     const tipo = c.responsavelTipo || 'membro';
     const chave = `${tipo}:${c.responsavelId}`;
-    if (!contagemChurras[chave]) {
-      contagemChurras[chave] = { nome: c.responsavelNome || '?', total: 0 };
-    }
+    if (!contagemChurras[chave]) contagemChurras[chave] = { nome: c.responsavelNome || '?', total: 0 };
     contagemChurras[chave].total += 1;
   });
   const rankingChurras = Object.values(contagemChurras).sort((a, b) => b.total - a.total);
 
   const listaRank = document.getElementById('lista-ranking');
-  if (listaRank) listaRank.innerHTML = rankingChurras.length
-    ? rankingChurras.map(r => `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.total} 🔥</span></li>`).join('')
-    : '<p class="hint">Sem dados ainda.</p>';
+  if (listaRank) {
+    if (!rankingChurras.length) {
+      listaRank.innerHTML = '<p class="hint">Sem dados ainda.</p>';
+      paginar('lista-ranking', [], () => '');
+    } else {
+      paginar('lista-ranking', rankingChurras, r =>
+        `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.total} 🔥</span></li>`
+      );
+    }
+  }
 
-  // Sumidos: por MEMBRO individual
   const contagemFaltas = {};
   realizados.forEach(c => {
     const presentes = c.presentes || [];
@@ -551,10 +559,18 @@ function renderRankings() {
   })).sort((a, b) => b.faltas - a.faltas);
 
   const listaSumido = document.getElementById('lista-sumido');
-  if (listaSumido) listaSumido.innerHTML = rankingSumido.length && totalRealizados
-    ? rankingSumido.map(r => `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.faltas}/${r.total} 👻</span></li>`).join('')
-    : '<p class="hint">Sem churrascos realizados ainda.</p>';
+  if (listaSumido) {
+    if (!rankingSumido.length || !totalRealizados) {
+      listaSumido.innerHTML = '<p class="hint">Sem churrascos realizados ainda.</p>';
+      paginar('lista-sumido', [], () => '');
+    } else {
+      paginar('lista-sumido', rankingSumido, r =>
+        `<li><span class="nome">${escapeHtml(r.nome)}</span><span class="valor">${r.faltas}/${r.total} 👻</span></li>`
+      );
+    }
+  }
 }
+
 
 // ===== HOME =====
 function renderHome() {
@@ -893,64 +909,106 @@ document.getElementById('form-foto').addEventListener('submit', async (e) => {
 });
 
 // Carregar galeria
+// Carregar galeria (paginado)
+let _fotosCache = [];
 function carregarFotos() {
   const q = query(collection(db, 'fotos'), orderBy('criadoEm', 'desc'));
   const unsub = onSnapshot(q, (snapshot) => {
-    const galeria = document.getElementById('galeria-fotos');
-    if (!galeria) return;
-
-    if (snapshot.empty) {
-      galeria.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora postar a primeira! 📸</p>';
-      return;
-    }
-
-    galeria.innerHTML = '';
-    snapshot.forEach((docSnap) => {
-      const f = docSnap.data();
-      const id = docSnap.id;
-      const data = f.criadoEm?.toDate?.() || new Date();
-      const dataFmt = data.toLocaleDateString('pt-BR');
-      const podeExcluir = isAdmin || (currentUser && f.uid === currentUser.uid);
-
-      const card = document.createElement('div');
-      card.className = 'foto-card';
-      card.innerHTML = `
-        <img src="${f.fotoUrl}" class="foto-thumb" alt="foto" loading="lazy" />
-        <div class="foto-legenda-box">
-          <span class="foto-titulo">${escapeHtml(f.legenda || 'Sem legenda')}</span>
-          <span class="foto-data">📅 ${dataFmt}</span>
-        </div>
-        ${podeExcluir ? `<button class="btn-excluir-foto" data-id="${id}">🗑️</button>` : ''}
-      `;
-
-      card.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-excluir-foto')) return;
-        abrirModalVerFoto(id, f, dataFmt);
-      });
-
-      const btnDel = card.querySelector('.btn-excluir-foto');
-      if (btnDel) {
-        btnDel.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          if (!confirm('Excluir essa foto e todos os comentários dela?')) return;
-          try {
-            const comSnap = await getDocs(collection(db, 'fotos', id, 'comentarios'));
-            for (const com of comSnap.docs) {
-              await deleteDoc(doc(db, 'fotos', id, 'comentarios', com.id));
-            }
-            await deleteDoc(doc(db, 'fotos', id));
-          } catch (err) {
-            console.error('Erro ao excluir foto:', err);
-            alert('Erro ao excluir.');
-          }
-        });
-      }
-
-      galeria.appendChild(card);
-    });
+    _fotosCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderGaleriaFotos();
   });
   unsubscribes.push(unsub);
 }
+
+window._reRenderFotos = renderGaleriaFotos;
+
+function renderGaleriaFotos() {
+  const galeria = document.getElementById('galeria-fotos');
+  if (!galeria) return;
+
+  if (!_fotosCache.length) {
+    galeria.innerHTML = '<p class="hint">Nenhuma foto ainda. Bora postar a primeira! 📸</p>';
+    const navVazia = document.getElementById('pag-galeria-fotos');
+    if (navVazia) { navVazia.classList.add('hidden'); navVazia.innerHTML = ''; }
+    return;
+  }
+
+  // Barra de paginação
+  let nav = document.getElementById('pag-galeria-fotos');
+  if (!nav) {
+    nav = document.createElement('div');
+    nav.id = 'pag-galeria-fotos';
+    nav.className = 'paginacao';
+    galeria.parentNode.insertBefore(nav, galeria.nextSibling);
+  }
+
+  const totalPaginas = Math.ceil(_fotosCache.length / ITENS_POR_PAGINA);
+  let pagina = estadoPaginacao['galeria-fotos'] ?? 0;
+  if (pagina >= totalPaginas) pagina = totalPaginas - 1;
+  if (pagina < 0) pagina = 0;
+  estadoPaginacao['galeria-fotos'] = pagina;
+
+  const inicio = pagina * ITENS_POR_PAGINA;
+  const fatia = _fotosCache.slice(inicio, inicio + ITENS_POR_PAGINA);
+
+  galeria.innerHTML = '';
+  fatia.forEach((f) => {
+    const id = f.id;
+    const data = f.criadoEm?.toDate?.() || new Date();
+    const dataFmt = data.toLocaleDateString('pt-BR');
+    const podeExcluir = isAdmin || (currentUser && f.uid === currentUser.uid);
+
+    const card = document.createElement('div');
+    card.className = 'foto-card';
+    card.innerHTML = `
+      <img src="${f.fotoUrl}" class="foto-thumb" alt="foto" loading="lazy" />
+      <div class="foto-legenda-box">
+        <span class="foto-titulo">${escapeHtml(f.legenda || 'Sem legenda')}</span>
+        <span class="foto-data">📅 ${dataFmt}</span>
+      </div>
+      ${podeExcluir ? `<button class="btn-excluir-foto" data-id="${id}">🗑️</button>` : ''}
+    `;
+
+    card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-excluir-foto')) return;
+      abrirModalVerFoto(id, f, dataFmt);
+    });
+
+    const btnDel = card.querySelector('.btn-excluir-foto');
+    if (btnDel) {
+      btnDel.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('Excluir essa foto e todos os comentários dela?')) return;
+        try {
+          const comSnap = await getDocs(collection(db, 'fotos', id, 'comentarios'));
+          for (const com of comSnap.docs) {
+            await deleteDoc(doc(db, 'fotos', id, 'comentarios', com.id));
+          }
+          await deleteDoc(doc(db, 'fotos', id));
+        } catch (err) {
+          console.error('Erro ao excluir foto:', err);
+          alert('Erro ao excluir.');
+        }
+      });
+    }
+
+    galeria.appendChild(card);
+  });
+
+  // Controles de paginação
+  if (totalPaginas <= 1) {
+    nav.classList.add('hidden');
+    nav.innerHTML = '';
+    return;
+  }
+  nav.classList.remove('hidden');
+  nav.innerHTML = `
+    <button class="pag-btn" ${pagina === 0 ? 'disabled' : ''} data-pag-acao="ant" data-pag-alvo="galeria-fotos">⬅️</button>
+    <span class="pag-info">Página ${pagina + 1} de ${totalPaginas}</span>
+    <button class="pag-btn" ${pagina >= totalPaginas - 1 ? 'disabled' : ''} data-pag-acao="prox" data-pag-alvo="galeria-fotos">➡️</button>
+  `;
+}
+
 
 // Abrir modal de visualização + comentários
 let unsubComentariosFoto = null;
@@ -959,6 +1017,41 @@ function abrirModalVerFoto(id, foto, dataFmt) {
   document.getElementById('ver-foto-legenda').textContent = foto.legenda || 'Sem legenda';
   document.getElementById('ver-foto-data').textContent = `📅 ${dataFmt} — por ${foto.autor || 'Anônimo'}`;
   modalVerFoto.classList.remove('hidden');
+
+  // ===== EDITAR LEGENDA (só quem postou ou admin) =====
+  const podeEditar = isAdmin || (currentUser && foto.uid === currentUser.uid);
+  const elLegenda = document.getElementById('ver-foto-legenda');
+  let btnEditar = document.getElementById('btn-editar-legenda');
+
+  // cria o botão uma única vez, ao lado da legenda
+  if (!btnEditar) {
+    btnEditar = document.createElement('button');
+    btnEditar.id = 'btn-editar-legenda';
+    btnEditar.className = 'btn-mini';
+    btnEditar.style.marginLeft = '8px';
+    btnEditar.textContent = '✏️ Editar';
+    elLegenda.parentNode.insertBefore(btnEditar, elLegenda.nextSibling);
+  }
+
+  // mostra ou esconde conforme permissão
+  btnEditar.classList.toggle('hidden', !podeEditar);
+
+  // ação de editar
+  btnEditar.onclick = () => {
+    const novaLegenda = prompt('✏️ Editar legenda:', foto.legenda || '');
+    if (novaLegenda === null) return; // cancelou
+    const legendaLimpa = novaLegenda.trim();
+    updateDoc(doc(db, 'fotos', id), { legenda: legendaLimpa || 'Sem legenda' })
+      .then(() => {
+        elLegenda.textContent = legendaLimpa || 'Sem legenda';
+        foto.legenda = legendaLimpa || 'Sem legenda';
+      })
+      .catch((err) => {
+        console.error('Erro ao editar legenda:', err);
+        alert('Erro ao salvar a legenda. Tenta de novo!');
+      });
+  };
+  // ===== FIM EDITAR LEGENDA =====
 
   const btnComentar = document.getElementById('btn-comentar-foto');
   btnComentar.onclick = async () => {
@@ -1034,6 +1127,93 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+// ============================================
+// PAGINAÇÃO REUTILIZÁVEL (5 itens por página)
+// ============================================
+const ITENS_POR_PAGINA = 5;
+const estadoPaginacao = {}; // guarda a página atual de cada lista
+
+/**
+ * Renderiza uma lista paginada.
+ * @param {string} containerId - id do elemento que recebe os itens
+ * @param {Array} itens - array de dados já ordenado
+ * @param {Function} renderItem - recebe um item e retorna string HTML
+ */
+function paginar(containerId, itens, renderItem) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Cria (ou reaproveita) a barra de paginação logo após o container
+  let nav = document.getElementById(`pag-${containerId}`);
+  if (!nav) {
+    nav = document.createElement('div');
+    nav.id = `pag-${containerId}`;
+    nav.className = 'paginacao';
+    container.parentNode.insertBefore(nav, container.nextSibling);
+  }
+
+  if (!itens.length) {
+    nav.classList.add('hidden');
+    if (estadoPaginacao[containerId]) estadoPaginacao[containerId] = 0;
+    return; // a função que chamou já cuidou da mensagem "sem dados"
+  }
+
+  const totalPaginas = Math.ceil(itens.length / ITENS_POR_PAGINA);
+
+  // Garante que a página atual existe e é válida
+  let pagina = estadoPaginacao[containerId] ?? 0;
+  if (pagina >= totalPaginas) pagina = totalPaginas - 1;
+  if (pagina < 0) pagina = 0;
+  estadoPaginacao[containerId] = pagina;
+
+  // Fatia os itens da página atual
+  const inicio = pagina * ITENS_POR_PAGINA;
+  const fatia = itens.slice(inicio, inicio + ITENS_POR_PAGINA);
+
+  container.innerHTML = fatia.map(renderItem).join('');
+
+  // Religa os event listeners das fotos (cards do mural usam JS)
+  if (typeof container.dataset.relistener === 'string') { /* noop */ }
+
+  // Controles
+  if (totalPaginas <= 1) {
+    nav.classList.add('hidden');
+    nav.innerHTML = '';
+    return;
+  }
+
+  nav.classList.remove('hidden');
+  nav.innerHTML = `
+    <button class="pag-btn" ${pagina === 0 ? 'disabled' : ''} data-pag-acao="ant" data-pag-alvo="${containerId}">⬅️</button>
+    <span class="pag-info">Página ${pagina + 1} de ${totalPaginas}</span>
+    <button class="pag-btn" ${pagina >= totalPaginas - 1 ? 'disabled' : ''} data-pag-acao="prox" data-pag-alvo="${containerId}">➡️</button>
+  `;
+}
+
+// Delegação de clique para as setinhas
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.pag-btn');
+  if (!btn) return;
+  const alvo = btn.dataset.pagAlvo;
+  const acao = btn.dataset.pagAcao;
+  if (!alvo) return;
+  const atual = estadoPaginacao[alvo] ?? 0;
+  estadoPaginacao[alvo] = acao === 'prox' ? atual + 1 : atual - 1;
+  if (typeof window.reRenderPaginado === 'function') {
+    window.reRenderPaginado(alvo);
+  }
+});
+
+// Re-renderiza a lista certa quando troca de página
+window.reRenderPaginado = (alvo) => {
+  switch (alvo) {
+    case 'lista-ranking':
+    case 'lista-sumido':   renderRankings(); break;
+    case 'lista-agenda':   renderAgenda();   break;
+    case 'lista-historico': renderHistorico(); break;
+    case 'galeria-fotos':  if (window._reRenderFotos) window._reRenderFotos(); break;
+  }
+};
 
 // ===== UTILS =====
 function formatarData(d) {
