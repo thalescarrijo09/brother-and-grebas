@@ -1198,3 +1198,40 @@ button[type="submit"]:hover,
   .foto-card .foto-thumb { height: 180px; }
   #ver-foto-img { max-height: 55vh; }
 }
+/* ===== PAGINAÇÃO ===== */
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.paginacao.hidden {
+  display: none;
+}
+.pag-btn {
+  background: linear-gradient(145deg, #d4500f, #a83a08);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.pag-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.pag-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.pag-info {
+  color: #d49060;
+  font-weight: bold;
+  font-size: 0.9rem;
+  min-width: 110px;
+  text-align: center;
+}
