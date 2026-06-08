@@ -1235,3 +1235,29 @@ button[type="submit"]:hover,
   min-width: 110px;
   text-align: center;
 }
+/* ===== BOTÃO EDITAR LEGENDA (MODAL FOTO) ===== */
+#btn-editar-legenda {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1.5px solid #8a3500;
+  color: #d49060;
+  padding: 6px 14px;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin: 4px auto 0;
+  transition: all 0.25s;
+}
+
+#btn-editar-legenda:hover {
+  background: rgba(138, 53, 0, 0.25);
+  border-color: #ff6b00;
+  color: #ff7a33;
+}
+
+#btn-editar-legenda.hidden {
+  display: none !important;
+}
