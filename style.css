@@ -1,30 +1,58 @@
 /* ==========================================================================
    BROTHERS E GREBAS — TEMA INSPIRADO NO MANIA DE CHURRASCO!
-   Paleta Oficial:
-   - Vermelho Mania: #D8232A / #E31C23
-   - Vinho Escuro:   #7C1216
-   - Grafite/Preto:  #222222 / #161616
-   - Fundo Bege:     #ECEAE6
-   - Superfície:     #FFFFFF / #F7F5F0
+   Com suporte completo a MODO CLARO e MODO ESCURO (body.dark-mode)
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Oswald:wght@500;600;700&display=swap');
 
 :root {
+  /* Cores de Marca (Mania de Churrasco) */
   --mania-red: #D8232A;
   --mania-red-bright: #E31C23;
   --mania-wine: #7C1216;
   --mania-dark: #222222;
   --mania-black: #161616;
-  --mania-beige: #ECEAE6;
-  --mania-beige-alt: #F7F5F0;
-  --mania-border: #DEDAD2;
   --mania-white: #FFFFFF;
-  --mania-text: #222222;
-  --mania-muted: #66615B;
   --mania-gold: #E59A17;
+
+  /* Superfícies & Texto (Modo Claro) */
+  --surface-bg: #ECEAE6;
+  --surface-card: #FFFFFF;
+  --surface-item: #F7F5F0;
+  --surface-input: #F7F5F0;
+  --surface-input-focus: #FFFFFF;
+  --border-color: #DEDAD2;
+  --divider-color: #ECEAE6;
+  --text-primary: #222222;
+  --text-heading: #222222;
+  --text-sub: #7C1216;
+  --text-muted: #66615B;
+  --placeholder-color: #8C857B;
+  --card-shadow: 0 6px 24px rgba(34, 34, 34, 0.06);
+
+  /* Fontes */
   --font-display: 'Oswald', 'Segoe UI', Impact, sans-serif;
   --font-body: 'Montserrat', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ===== VARIÁVEIS DO MODO ESCURO (STEAKHOUSE DARK) ===== */
+body.dark-mode {
+  --mania-red: #E31C23;
+  --mania-red-bright: #FF2E36;
+  --mania-wine: #9E191E;
+  --surface-bg: #121212;
+  --surface-card: #1C1C1C;
+  --surface-item: #252525;
+  --surface-input: #161616;
+  --surface-input-focus: #202020;
+  --border-color: #333333;
+  --divider-color: #2A2A2A;
+  --text-primary: #F2EFE9;
+  --text-heading: #FFFFFF;
+  --text-sub: #FF6B70;
+  --text-muted: #A8A29A;
+  --placeholder-color: #78736D;
+  --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
 /* ===== RESET & BASE ===== */
@@ -36,15 +64,16 @@
 
 body {
   font-family: var(--font-body);
-  background-color: var(--mania-beige);
-  color: var(--mania-text);
+  background-color: var(--surface-bg);
+  color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.6;
   position: relative;
   overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Textura sutil de fundo com toque quente na base */
+/* Textura sutil de fundo (Modo Claro) */
 body::before {
   content: '';
   position: fixed;
@@ -54,6 +83,14 @@ body::before {
     linear-gradient(180deg, #F3F1ED 0%, #ECEAE6 100%);
   z-index: -2;
   pointer-events: none;
+}
+
+/* Textura de brasa e carvão (Modo Escuro) */
+body.dark-mode::before {
+  background:
+    radial-gradient(ellipse at 25% 100%, rgba(227, 28, 35, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 100%, rgba(124, 18, 22, 0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #0E0E0E 0%, #141414 100%);
 }
 
 body::after {
@@ -67,10 +104,17 @@ body::after {
   pointer-events: none;
 }
 
-/* ===== PARTÍCULAS DE BRASA (discretas sobre o tema claro/escuro) ===== */
+body.dark-mode::after {
+  background-image:
+    radial-gradient(circle at 15% 92%, rgba(227, 28, 35, 0.18) 0%, transparent 10%),
+    radial-gradient(circle at 50% 95%, rgba(255, 80, 0, 0.12) 0%, transparent 12%),
+    radial-gradient(circle at 85% 94%, rgba(124, 18, 22, 0.2) 0%, transparent 10%);
+}
+
+/* ===== PARTÍCULAS DE BRASA ===== */
 @keyframes ember {
   0%   { transform: translateY(0) translateX(0); opacity: 0; }
-  15%  { opacity: 0.55; }
+  15%  { opacity: 0.65; }
   100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
 }
 
@@ -79,16 +123,54 @@ body::after {
   bottom: 0;
   width: 4px;
   height: 4px;
-  background: radial-gradient(circle, #E31C23, #7C1216);
+  background: radial-gradient(circle, #FF5722, #E31C23);
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  box-shadow: 0 0 6px rgba(216, 35, 42, 0.35);
+  box-shadow: 0 0 6px rgba(227, 28, 35, 0.45);
   animation: ember 6s linear infinite;
 }
 
 .hidden {
   display: none !important;
+}
+
+/* ===== BOTÃO ALTERNADOR DE TEMA (ESCURO / CLARO) ===== */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-theme-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: var(--mania-white);
+  padding: 6px 14px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  transition: all 0.22s ease;
+}
+
+.btn-theme-toggle:hover {
+  background: var(--mania-red);
+  border-color: var(--mania-red);
+  color: var(--mania-white);
+  transform: translateY(-1px);
+}
+
+.btn-theme-floating {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 10001;
+  background: rgba(22, 22, 22, 0.85);
+  backdrop-filter: blur(6px);
 }
 
 /* ===== TELA DE LOGIN (ESTILO STEAKHOUSE PREMIUM) ===== */
@@ -97,7 +179,7 @@ body::after {
   inset: 0;
   background:
     radial-gradient(circle at 50% 25%, rgba(216, 35, 42, 0.28) 0%, transparent 60%),
-    linear-gradient(160deg, #161616 0%, #222222 55%, #2D0B0D 100%);
+    linear-gradient(160deg, #121212 0%, #1E1E1E 55%, #2B0A0C 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -106,15 +188,17 @@ body::after {
 }
 
 .login-box {
-  background: var(--mania-white);
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
   border-top: 6px solid var(--mania-red);
   border-radius: 16px;
   padding: 42px 34px;
   max-width: 420px;
   width: 100%;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
   text-align: center;
   animation: slideUp 0.4s ease-out;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 @keyframes slideUp {
@@ -124,8 +208,8 @@ body::after {
 
 .brand-seal {
   display: inline-block;
-  background: var(--mania-beige);
-  color: var(--mania-wine);
+  background: rgba(216, 35, 42, 0.14);
+  color: var(--mania-red-bright);
   font-family: var(--font-display);
   font-size: 0.78rem;
   font-weight: 700;
@@ -138,7 +222,7 @@ body::after {
 
 .login-box h1 {
   font-family: var(--font-display);
-  color: var(--mania-dark);
+  color: var(--text-heading);
   margin-bottom: 8px;
   font-size: 2.1rem;
   font-weight: 700;
@@ -147,7 +231,7 @@ body::after {
 }
 
 .login-box .subtitle {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   margin-bottom: 26px;
   font-size: 0.95rem;
   font-weight: 500;
@@ -161,24 +245,24 @@ body::after {
 
 .login-box input {
   padding: 14px 16px;
-  background: var(--mania-beige-alt);
-  border: 2px solid var(--mania-border);
+  background: var(--surface-input);
+  border: 2px solid var(--border-color);
   border-radius: 8px;
-  color: var(--mania-text);
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-family: var(--font-body);
   transition: all 0.25s;
 }
 
 .login-box input::placeholder {
-  color: #8C857B;
+  color: var(--placeholder-color);
 }
 
 .login-box input:focus {
   outline: none;
   border-color: var(--mania-red);
-  background: var(--mania-white);
-  box-shadow: 0 0 0 3px rgba(216, 35, 42, 0.12);
+  background: var(--surface-input-focus);
+  box-shadow: 0 0 0 3px rgba(216, 35, 42, 0.18);
 }
 
 .login-box button {
@@ -195,17 +279,17 @@ body::after {
   cursor: pointer;
   margin-top: 6px;
   transition: all 0.25s;
-  box-shadow: 0 6px 18px rgba(216, 35, 42, 0.3);
+  box-shadow: 0 6px 18px rgba(216, 35, 42, 0.35);
 }
 
 .login-box button:hover {
   transform: translateY(-2px);
   background: var(--mania-wine);
-  box-shadow: 0 8px 22px rgba(124, 18, 22, 0.4);
+  box-shadow: 0 8px 22px rgba(124, 18, 22, 0.45);
 }
 
 .login-erro {
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-size: 0.88rem;
   min-height: 20px;
   margin: 6px 0 0;
@@ -214,16 +298,16 @@ body::after {
 
 .login-hint {
   margin-top: 22px;
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 500;
 }
 
 /* ===== HEADER & HERO BANNER (ESTILO MANIA DE CHURRASCO) ===== */
 header {
-  background: var(--mania-dark);
+  background: var(--mania-black);
   border-bottom: 5px solid var(--mania-red);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
   position: relative;
   z-index: 10;
   padding-bottom: 18px;
@@ -388,31 +472,32 @@ main {
 
 /* ===== CARDS / SEÇÕES ===== */
 .card {
-  background: var(--mania-white);
-  border: 1px solid var(--mania-border);
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
   border-top: 4px solid var(--mania-red);
   border-radius: 12px;
   padding: 28px;
   margin-bottom: 24px;
-  box-shadow: 0 6px 24px rgba(34, 34, 34, 0.06);
+  box-shadow: var(--card-shadow);
   position: relative;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
 }
 
 .card h2, section h2 {
   font-family: var(--font-display);
-  color: var(--mania-dark);
+  color: var(--text-heading);
   margin-bottom: 18px;
   font-size: 1.5rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  border-bottom: 2px solid var(--mania-beige);
+  border-bottom: 2px solid var(--divider-color);
   padding-bottom: 10px;
 }
 
 .card h3, section h3 {
   font-family: var(--font-display);
-  color: var(--mania-wine);
+  color: var(--text-sub);
   margin-bottom: 12px;
   margin-top: 15px;
   font-size: 1.15rem;
@@ -428,7 +513,7 @@ form {
 }
 
 .form-label-modal {
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-weight: 700;
   font-size: 0.9rem;
   text-align: left;
@@ -444,14 +529,20 @@ input[type="file"],
 select,
 textarea {
   padding: 13px 15px;
-  background: var(--mania-beige-alt);
-  border: 1.5px solid var(--mania-border);
+  background: var(--surface-input);
+  border: 1.5px solid var(--border-color);
   border-radius: 8px;
-  color: var(--mania-text);
+  color: var(--text-primary);
   font-size: 0.96rem;
   font-family: var(--font-body);
   transition: all 0.22s;
   width: 100%;
+}
+
+body.dark-mode input[type="date"],
+body.dark-mode input[type="time"],
+body.dark-mode select {
+  color-scheme: dark;
 }
 
 input:focus,
@@ -459,13 +550,13 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--mania-red);
-  background: var(--mania-white);
-  box-shadow: 0 0 0 3px rgba(216, 35, 42, 0.12);
+  background: var(--surface-input-focus);
+  box-shadow: 0 0 0 3px rgba(216, 35, 42, 0.16);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #8C857B;
+  color: var(--placeholder-color);
 }
 
 textarea {
@@ -518,20 +609,20 @@ button[type="submit"],
   cursor: pointer;
   transition: all 0.25s;
   margin-top: 5px;
-  box-shadow: 0 4px 14px rgba(216, 35, 42, 0.28);
+  box-shadow: 0 4px 14px rgba(216, 35, 42, 0.3);
 }
 
 button[type="submit"]:hover,
 .btn-primary:hover {
   transform: translateY(-2px);
   background: var(--mania-wine);
-  box-shadow: 0 6px 18px rgba(124, 18, 22, 0.35);
+  box-shadow: 0 6px 18px rgba(124, 18, 22, 0.4);
 }
 
 .btn-excluir {
   background: transparent;
   border: 1.5px solid var(--mania-red);
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   padding: 6px 14px;
   border-radius: 50px;
   cursor: pointer;
@@ -560,11 +651,11 @@ button[type="submit"]:hover,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--mania-beige-alt);
-  border: 1.5px solid var(--mania-border);
+  background: var(--surface-item);
+  border: 1.5px solid var(--border-color);
   padding: 8px 16px;
   border-radius: 50px;
-  color: var(--mania-dark);
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.92rem;
   transition: all 0.22s;
@@ -572,14 +663,13 @@ button[type="submit"]:hover,
 
 .membro-item:hover {
   border-color: var(--mania-red);
-  background: var(--mania-white);
-  box-shadow: 0 3px 10px rgba(216, 35, 42, 0.12);
+  box-shadow: 0 3px 10px rgba(216, 35, 42, 0.16);
 }
 
 .membro-item button {
   background: transparent;
   border: none;
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   cursor: pointer;
   font-size: 0.9rem;
   padding: 2px 5px;
@@ -588,14 +678,14 @@ button[type="submit"]:hover,
 }
 
 .membro-item button:hover {
-  background: rgba(216, 35, 42, 0.12);
-  color: var(--mania-wine);
+  background: rgba(216, 35, 42, 0.15);
+  color: var(--mania-white);
 }
 
 /* ===== EVENTOS / CHURRASCOS ===== */
 .evento-item {
-  background: var(--mania-beige-alt);
-  border: 1px solid var(--mania-border);
+  background: var(--surface-item);
+  border: 1px solid var(--border-color);
   border-left: 5px solid var(--mania-red);
   border-radius: 10px;
   padding: 16px 20px;
@@ -605,14 +695,13 @@ button[type="submit"]:hover,
 
 .evento-item:hover {
   transform: translateX(4px);
-  border-left-color: var(--mania-wine);
-  background: var(--mania-white);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  border-left-color: var(--mania-red-bright);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
 .evento-item .data {
   font-family: var(--font-display);
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-weight: 700;
   font-size: 1.15rem;
   text-transform: uppercase;
@@ -621,13 +710,13 @@ button[type="submit"]:hover,
 }
 
 .evento-item .info {
-  color: var(--mania-text);
+  color: var(--text-primary);
   margin: 4px 0;
   font-size: 0.95rem;
 }
 
 .evento-item .info strong {
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-weight: 700;
 }
 
@@ -643,16 +732,15 @@ button[type="submit"]:hover,
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--mania-beige-alt);
+  background: var(--surface-item);
   padding: 11px 14px;
   border-radius: 8px;
-  border: 1.5px solid var(--mania-border);
+  border: 1.5px solid var(--border-color);
   transition: all 0.22s;
 }
 
 .presenca-item:hover {
   border-color: var(--mania-red);
-  background: var(--mania-white);
 }
 
 .presenca-item input[type="checkbox"] {
@@ -664,7 +752,7 @@ button[type="submit"]:hover,
 
 .presenca-item label {
   cursor: pointer;
-  color: var(--mania-dark);
+  color: var(--text-primary);
   font-weight: 600;
   flex: 1;
 }
@@ -681,11 +769,11 @@ button[type="submit"]:hover,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--mania-beige-alt);
+  background: var(--surface-item);
   padding: 13px 18px;
   margin-bottom: 10px;
   border-radius: 8px;
-  border: 1px solid var(--mania-border);
+  border: 1px solid var(--border-color);
   border-left: 5px solid var(--mania-red);
   transition: all 0.22s;
 }
@@ -693,13 +781,12 @@ button[type="submit"]:hover,
 #lista-ranking li:hover,
 #lista-sumido li:hover {
   transform: translateX(4px);
-  background: var(--mania-white);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
 }
 
 #lista-ranking li:first-child {
   border-left-color: var(--mania-gold);
-  background: linear-gradient(90deg, rgba(229, 154, 23, 0.14), var(--mania-beige-alt));
+  background: linear-gradient(90deg, rgba(229, 154, 23, 0.16), var(--surface-item));
 }
 
 #lista-ranking li:first-child .nome::before {
@@ -715,13 +802,13 @@ button[type="submit"]:hover,
 }
 
 .nome {
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-weight: 700;
 }
 
 .valor {
   font-family: var(--font-display);
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-weight: 700;
   font-size: 1.15rem;
 }
@@ -739,8 +826,8 @@ button[type="submit"]:hover,
 }
 
 .stat-card {
-  background: var(--mania-beige-alt);
-  border: 1.5px solid var(--mania-border);
+  background: var(--surface-item);
+  border: 1.5px solid var(--border-color);
   border-bottom: 4px solid var(--mania-red);
   border-radius: 12px;
   padding: 20px 16px;
@@ -751,12 +838,11 @@ button[type="submit"]:hover,
 .stat-card:hover {
   transform: translateY(-4px);
   border-color: var(--mania-red);
-  background: var(--mania-white);
-  box-shadow: 0 8px 20px rgba(216, 35, 42, 0.12);
+  box-shadow: 0 8px 20px rgba(216, 35, 42, 0.18);
 }
 
 .stat-card .label {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-family: var(--font-display);
   font-size: 0.85rem;
   font-weight: 600;
@@ -767,7 +853,7 @@ button[type="submit"]:hover,
 
 .stat-card .value {
   font-family: var(--font-display);
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-size: 1.7rem;
   font-weight: 700;
 }
@@ -780,7 +866,7 @@ button[type="submit"]:hover,
   margin-top: 8px;
   display: block;
   cursor: pointer;
-  border: 1px solid var(--mania-border);
+  border: 1px solid var(--border-color);
   transition: transform 0.25s;
 }
 
@@ -797,8 +883,8 @@ button[type="submit"]:hover,
 }
 
 .ofensa-item {
-  background: var(--mania-beige-alt);
-  border: 1px solid var(--mania-border);
+  background: var(--surface-item);
+  border: 1px solid var(--border-color);
   border-left: 5px solid var(--mania-red);
   border-radius: 10px;
   padding: 16px 20px;
@@ -808,19 +894,18 @@ button[type="submit"]:hover,
 
 .ofensa-item:hover {
   transform: translateX(4px);
-  background: var(--mania-white);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
 .ofensa-item .data-ofensa {
   display: block;
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-size: 0.76rem;
   margin-bottom: 4px;
 }
 
 .ofensa-item .autor {
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-weight: 700;
   font-size: 1rem;
   display: block;
@@ -832,7 +917,7 @@ button[type="submit"]:hover,
 }
 
 .ofensa-item .texto {
-  color: var(--mania-text);
+  color: var(--text-primary);
   line-height: 1.5;
   word-wrap: break-word;
   margin-bottom: 10px;
@@ -844,14 +929,14 @@ button[type="submit"]:hover,
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed var(--mania-border);
+  border-top: 1px dashed var(--border-color);
   flex-wrap: wrap;
 }
 
 .btn-comentar {
-  background: var(--mania-white);
+  background: transparent;
   border: 1.5px solid var(--mania-red);
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   padding: 5px 14px;
   border-radius: 50px;
   cursor: pointer;
@@ -869,7 +954,7 @@ button[type="submit"]:hover,
 }
 
 .contador-comentarios {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 600;
   display: flex;
@@ -880,9 +965,9 @@ button[type="submit"]:hover,
 .form-comentario {
   margin-top: 12px;
   padding: 14px;
-  background: var(--mania-beige-alt);
+  background: var(--surface-item);
   border-radius: 8px;
-  border: 1px solid var(--mania-border);
+  border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -891,7 +976,7 @@ button[type="submit"]:hover,
 .form-comentario textarea {
   min-height: 60px;
   font-size: 0.9rem;
-  background: var(--mania-white);
+  background: var(--surface-input);
 }
 
 .form-comentario .btn-mini {
@@ -924,8 +1009,8 @@ button[type="submit"]:hover,
 }
 
 .comentario-item {
-  background: var(--mania-white);
-  border: 1px solid var(--mania-border);
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
   border-left: 4px solid var(--mania-wine);
   border-radius: 8px;
   padding: 10px 14px;
@@ -935,11 +1020,11 @@ button[type="submit"]:hover,
 }
 
 .comentario-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
 }
 
 .comentario-item .autor-comentario {
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-weight: 700;
   font-size: 0.85rem;
   display: block;
@@ -951,14 +1036,14 @@ button[type="submit"]:hover,
 }
 
 .comentario-item .data-comentario {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-size: 0.72rem;
   display: block;
   margin-bottom: 4px;
 }
 
 .comentario-item .texto-comentario {
-  color: var(--mania-text);
+  color: var(--text-primary);
   word-wrap: break-word;
   line-height: 1.45;
 }
@@ -969,7 +1054,7 @@ button[type="submit"]:hover,
   right: 6px;
   background: transparent;
   border: none;
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   cursor: pointer;
   font-size: 0.85rem;
   padding: 2px 6px;
@@ -983,12 +1068,12 @@ button[type="submit"]:hover,
 }
 
 .comentario-item .btn-excluir-mini:hover {
-  background: rgba(216, 35, 42, 0.12);
+  background: rgba(216, 35, 42, 0.15);
 }
 
 /* ===== HINTS / MENSAGENS ===== */
 .hint {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-style: italic;
   text-align: center;
   padding: 20px;
@@ -1009,14 +1094,14 @@ button[type="submit"]:hover,
 }
 
 .foto-card {
-  background: var(--mania-white);
-  border: 1px solid var(--mania-border);
+  background: var(--surface-item);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.25s;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .foto-card img,
@@ -1030,26 +1115,26 @@ button[type="submit"]:hover,
 .foto-card:hover {
   transform: translateY(-5px);
   border-color: var(--mania-red);
-  box-shadow: 0 10px 24px rgba(216, 35, 42, 0.18);
+  box-shadow: 0 10px 24px rgba(216, 35, 42, 0.24);
 }
 
 .foto-card .foto-thumb {
   width: 100%;
   height: 220px;
   object-fit: cover;
-  background: var(--mania-dark);
+  background: var(--mania-black);
   display: block;
 }
 
 .foto-card .foto-legenda-box {
   padding: 12px 14px;
-  background: var(--mania-white);
+  background: var(--surface-card);
   border-top: 3px solid var(--mania-red);
 }
 
 .foto-card .foto-titulo {
   font-family: var(--font-display);
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-weight: 700;
   font-size: 1rem;
   text-transform: uppercase;
@@ -1060,7 +1145,7 @@ button[type="submit"]:hover,
 }
 
 .foto-card .foto-data {
-  color: var(--mania-muted);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -1091,7 +1176,7 @@ button[type="submit"]:hover,
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(22, 22, 22, 0.82);
+  background: rgba(10, 10, 10, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1100,13 +1185,14 @@ button[type="submit"]:hover,
 }
 
 .modal-box {
-  background: var(--mania-white);
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
   border-top: 6px solid var(--mania-red);
   border-radius: 16px;
   padding: 28px;
   max-width: 480px;
   width: 100%;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -1114,14 +1200,14 @@ button[type="submit"]:hover,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid var(--mania-beige);
+  border-bottom: 2px solid var(--divider-color);
   padding-bottom: 12px;
   margin-bottom: 18px;
 }
 
 .modal-header h2 {
   font-family: var(--font-display);
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-size: 1.45rem;
   text-transform: uppercase;
   border: none;
@@ -1132,7 +1218,7 @@ button[type="submit"]:hover,
 .modal-close, .modal-foto-close {
   background: transparent;
   border: none;
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-size: 1.35rem;
   font-weight: 700;
   cursor: pointer;
@@ -1142,17 +1228,17 @@ button[type="submit"]:hover,
 }
 
 .modal-close:hover, .modal-foto-close:hover {
-  background: rgba(216, 35, 42, 0.12);
-  color: var(--mania-wine);
+  background: rgba(216, 35, 42, 0.15);
+  color: var(--mania-white);
 }
 
 .foto-dropzone {
   border: 2px dashed var(--mania-red);
-  background: var(--mania-beige-alt);
+  background: var(--surface-item);
   border-radius: 12px;
   padding: 30px 20px;
   text-align: center;
-  color: var(--mania-red);
+  color: var(--mania-red-bright);
   font-weight: 700;
   cursor: pointer;
   display: block;
@@ -1160,8 +1246,8 @@ button[type="submit"]:hover,
 }
 
 .foto-dropzone:hover {
-  border-color: var(--mania-wine);
-  background: rgba(216, 35, 42, 0.06);
+  border-color: var(--mania-red-bright);
+  background: rgba(216, 35, 42, 0.08);
 }
 
 #foto-preview {
@@ -1174,7 +1260,7 @@ button[type="submit"]:hover,
 .modal-foto-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(18, 18, 18, 0.94);
+  background: rgba(12, 12, 12, 0.94);
   z-index: 10000;
   overflow-y: auto;
   padding: 40px 20px;
@@ -1222,7 +1308,8 @@ button[type="submit"]:hover,
 
 .comentarios-foto-wrapper {
   width: 100%;
-  background: var(--mania-white);
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
   border-top: 4px solid var(--mania-red);
   border-radius: 12px;
   padding: 20px;
@@ -1253,7 +1340,7 @@ button[type="submit"]:hover,
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s, background 0.2s, opacity 0.15s;
-  box-shadow: 0 3px 8px rgba(216, 35, 42, 0.25);
+  box-shadow: 0 3px 8px rgba(216, 35, 42, 0.28);
 }
 
 .pag-btn:hover:not(:disabled) {
@@ -1267,7 +1354,7 @@ button[type="submit"]:hover,
 }
 
 .pag-info {
-  color: var(--mania-dark);
+  color: var(--text-heading);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
@@ -1305,7 +1392,7 @@ button[type="submit"]:hover,
 
 /* ===== RODAPÉ INSTITUCIONAL (ESTILO MANIA DE CHURRASCO) ===== */
 .site-footer {
-  background: var(--mania-dark);
+  background: var(--mania-black);
   color: #D5D0C8;
   text-align: center;
   padding: 28px 20px;
@@ -1344,7 +1431,7 @@ button[type="submit"]:hover,
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--mania-beige);
+  background: var(--surface-bg);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -1434,8 +1521,8 @@ button[type="submit"]:hover,
     font-size: 0.85rem;
   }
 
-  .btn-logout {
-    padding: 5px 12px;
-    font-size: 0.78rem;
+  .btn-logout, .btn-theme-toggle {
+    padding: 5px 11px;
+    font-size: 0.76rem;
   }
 }
