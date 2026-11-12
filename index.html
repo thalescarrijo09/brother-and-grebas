@@ -11,10 +11,13 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>" />
 </head>
-<body>
+<body class="dark-mode">
 
   <!-- ===== TELA DE LOGIN ===== -->
   <div id="tela-login" class="tela-login">
+    <button type="button" id="btn-tema-login" class="btn-theme-toggle btn-theme-floating" title="Alternar Modo Escuro / Claro">
+      ☀️ Modo Claro
+    </button>
     <div class="login-box">
       <div class="brand-seal">DESDE SEMPRE • FOGO FORTE</div>
       <h1>🔥 Brothers e Grebas! 🥩</h1>
@@ -39,7 +42,12 @@
           <span id="user-nome">👤</span>
           <span id="user-badge" class="badge-admin hidden">👑 ADMIN</span>
         </div>
-        <button id="btn-logout" class="btn-logout">🚪 Sair</button>
+        <div class="header-actions">
+          <button type="button" id="btn-tema" class="btn-theme-toggle" title="Alternar Modo Escuro / Claro">
+            ☀️ Modo Claro
+          </button>
+          <button id="btn-logout" class="btn-logout">🚪 Sair</button>
+        </div>
       </div>
 
       <div class="hero-banner">
@@ -191,7 +199,7 @@
           <form id="form-financeiro">
             <input type="number" step="0.01" id="financeiro-saldo" placeholder="💵 Saldo atual (ex: 350.00)" required />
             <button type="submit">💾 Salvar Saldo</button>
-            <p id="financeiro-status" class="login-erro" style="color:#1e7e34;"></p>
+            <p id="financeiro-status" class="login-erro" style="color:#2ea043;"></p>
           </form>
           <div id="financeiro-atual" style="margin-top:15px;"></div>
         </div>
@@ -209,7 +217,7 @@
             <input type="email"    id="usuario-email" placeholder="📧 Email de login" required />
             <input type="password" id="usuario-senha" placeholder="🔒 Senha (mín. 6 caracteres)" required minlength="6" />
             <button type="submit">➕ Criar Conta + Membro</button>
-            <p id="usuario-status" class="login-erro" style="color:#D8232A;"></p>
+            <p id="usuario-status" class="login-erro" style="color:#E31C23;"></p>
           </form>
         </div>
 
@@ -226,7 +234,7 @@
               <option value="">Membro 2...</option>
             </select>
             <button type="submit">➕ Criar Dupla</button>
-            <p id="dupla-status" class="login-erro" style="color:#D8232A;"></p>
+            <p id="dupla-status" class="login-erro" style="color:#E31C23;"></p>
           </form>
           <div id="lista-duplas-admin" style="margin-top:15px;">
             <p class="hint">Carregando...</p>
@@ -278,7 +286,7 @@
         <label class="form-label-modal">Legenda / Título</label>
         <input type="text" id="foto-legenda" placeholder="Ex: Campeão da Rodada #42" />
 
-        <p id="foto-status" class="login-erro" style="color:#D8232A;"></p>
+        <p id="foto-status" class="login-erro" style="color:#E31C23;"></p>
         <button type="submit" id="btn-postar-foto" class="btn-primary" style="align-self:flex-end;width:auto;padding:10px 24px;">Postar Foto</button>
       </form>
     </div>
@@ -302,7 +310,7 @@
     </div>
   </div>
 
-  <!-- ===== BRASAS FLUTUANTES ===== -->
+  <!-- ===== BRASAS FLUTUANTES & TEMA ESCURO/CLARO ===== -->
   <script>
     function criarBrasa() {
       const ember = document.createElement('div');
@@ -316,6 +324,41 @@
       setTimeout(() => ember.remove(), 8000);
     }
     setInterval(criarBrasa, 400);
+
+    // Controle de Modo Escuro / Modo Claro (sem interferir no script.js)
+    (function () {
+      const btnHeader = document.getElementById('btn-tema');
+      const btnLogin = document.getElementById('btn-tema-login');
+
+      function atualizarBotoesTema(isDark) {
+        const texto = isDark ? '☀️ Modo Claro' : '🌙 Modo Escuro';
+        if (btnHeader) btnHeader.textContent = texto;
+        if (btnLogin) btnLogin.textContent = texto;
+      }
+
+      function aplicarTema(tema) {
+        const isDark = tema === 'dark';
+        document.body.classList.toggle('dark-mode', isDark);
+        atualizarBotoesTema(isDark);
+        try {
+          localStorage.setItem('bg-theme', tema);
+        } catch (e) {}
+      }
+
+      let temaSalvo = 'dark';
+      try {
+        temaSalvo = localStorage.getItem('bg-theme') || 'dark';
+      } catch (e) {}
+      aplicarTema(temaSalvo);
+
+      function alternarTema() {
+        const novoTema = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+        aplicarTema(novoTema);
+      }
+
+      if (btnHeader) btnHeader.addEventListener('click', alternarTema);
+      if (btnLogin) btnLogin.addEventListener('click', alternarTema);
+    })();
   </script>
 
   <!-- ===== SCRIPT (module) ===== -->
